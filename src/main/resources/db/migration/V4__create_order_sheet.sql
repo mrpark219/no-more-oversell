@@ -11,7 +11,7 @@ CREATE TABLE order_sheet
     updated_at        DATETIME(6)  NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY UNI_ORDER_SHEET_TOKEN (order_sheet_token),
-    CONSTRAINT chk_order_sheet_price_non_negative CHECK (original_price >= 0 AND sale_price >= 0)
+    CONSTRAINT CHK_ORDER_SHEET_PRICE_NON_NEGATIVE CHECK (original_price >= 0 AND sale_price >= 0)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;

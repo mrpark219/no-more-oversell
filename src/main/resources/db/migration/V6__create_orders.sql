@@ -12,7 +12,7 @@ CREATE TABLE orders
     PRIMARY KEY (id),
     UNIQUE KEY UNI_ORDERS_ORDER_SHEET_ID (order_sheet_id),
     KEY IDX_ORDERS_USER_PRODUCT_STATUS (user_id, product_id, status),
-    CONSTRAINT chk_orders_price_non_negative CHECK (original_price >= 0 AND sale_price >= 0)
+    CONSTRAINT CHK_ORDERS_PRICE_NON_NEGATIVE CHECK (original_price >= 0 AND sale_price >= 0)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
