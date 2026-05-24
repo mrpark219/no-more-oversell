@@ -1,0 +1,20 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: no-more-oversell-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: no_more_oversell
+      MYSQL_USER: no_more_oversell
+      MYSQL_PASSWORD: no_more_oversell
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Seoul
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  mysql-data:

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<included>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ssZ} %highlight([%level]) [%X{ipaddr:-server}] [%thread{10}] [%file:%L] %cyan(%logger{20}) - %msg%n</pattern>
+        </encoder>
+    </appender>
+</included>

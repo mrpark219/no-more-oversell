@@ -1,3 +1,23 @@
 spring:
   application:
     name: no-more-oversell
+  datasource:
+    url: jdbc:mysql://localhost:3306/no_more_oversell?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: no_more_oversell
+    password: no_more_oversell
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-timeout: 5000
+      max-lifetime: 270000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_batch_fetch_size: 1000
+        show_sql: true
+  flyway:
+    enabled: true
+    locations:
+      - classpath:db/migration
+      - classpath:db/seed
