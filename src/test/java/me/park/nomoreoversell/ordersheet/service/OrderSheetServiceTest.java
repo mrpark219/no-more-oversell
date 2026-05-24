@@ -1,5 +1,6 @@
 package me.park.nomoreoversell.ordersheet.service;
 
+import me.park.nomoreoversell.exception.SoldOutException;
 import me.park.nomoreoversell.exception.StayProductNotOpenException;
 import me.park.nomoreoversell.inventory.service.InventoryService;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
@@ -79,24 +80,20 @@ class OrderSheetServiceTest {
     }
 
     @Test
-    @DisplayName("재고 서비스가 판매 불가로 응답하면 체크아웃도 판매 불가로 응답한다")
-    void checkoutReturnsNoStockWhenInventoryServiceReturnsFalse() {
+    @DisplayName("재고가 없으면 체크아웃 주문서를 생성하지 않는다")
+    void checkoutRejectsSoldOutProduct() {
         // given
         var userId = 1L;
         var productId = 10L;
         given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.empty());
         given(stayProductService.getOpen(productId)).willReturn(stayProduct(productId));
         given(inventoryService.hasStock(productId)).willReturn(false);
-        given(pointService.available(userId)).willReturn(5_000L);
-        given(orderSheetRepository.save(any(OrderSheet.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
 
-        // when
-        var response = orderSheetService.checkout(new CheckoutRequest(userId, productId));
-
-        // then
-        assertThat(response.stayProduct().hasStock()).isFalse();
+        // when & then
+        assertThatThrownBy(() -> orderSheetService.checkout(new CheckoutRequest(userId, productId)))
+                .isInstanceOf(SoldOutException.class);
         verify(inventoryService).hasStock(productId);
+        verifyNoInteractions(pointService, orderSheetRepository);
     }
 
     @Test

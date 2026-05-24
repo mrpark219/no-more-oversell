@@ -69,7 +69,7 @@ VALUES
     (
         900001,
         900001,
-        20,
+        10,
         0,
         CURRENT_TIMESTAMP(6),
         CURRENT_TIMESTAMP(6)

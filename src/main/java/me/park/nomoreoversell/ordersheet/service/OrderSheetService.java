@@ -2,6 +2,7 @@ package me.park.nomoreoversell.ordersheet.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import me.park.nomoreoversell.exception.SoldOutException;
 import me.park.nomoreoversell.inventory.service.InventoryService;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
 import me.park.nomoreoversell.ordersheet.repository.OrderSheetRepository;
@@ -31,6 +32,14 @@ public class OrderSheetService {
     private CheckoutResponse createCheckoutResponse(CheckoutRequest request) {
         var stayProduct = stayProductService.getOpen(request.stayProductId());
         var hasStock = inventoryService.hasStock(request.stayProductId());
+        if (!hasStock) {
+            log.info(
+                    "체크아웃 주문서 생성 실패: 재고가 없습니다. userId={}, stayProductId={}",
+                    request.userId(),
+                    request.stayProductId()
+            );
+            throw new SoldOutException();
+        }
         var availablePoint = pointService.available(request.userId());
         var orderSheet = createOrderSheet(request, stayProduct);
 

@@ -23,6 +23,15 @@ class PaymentPlanValidatorTest {
     }
 
     @Test
+    @DisplayName("Y페이와 포인트를 함께 사용할 수 있다")
+    void validateSucceedsWhenYPayAndPointAreUsed() {
+        paymentPlanValidator.validate(10_000L, List.of(
+                new PaymentDetailRequest(PaymentMethod.Y_PAY, 7_000L),
+                new PaymentDetailRequest(PaymentMethod.POINT, 3_000L)
+        ));
+    }
+
+    @Test
     @DisplayName("PG 결제수단이 2개면 결제 조합 검증에 실패한다")
     void validateThrowsExceptionWhenPgPaymentMethodCountIsGreaterThanOne() {
         assertThatThrownBy(() -> paymentPlanValidator.validate(10_000L, List.of(

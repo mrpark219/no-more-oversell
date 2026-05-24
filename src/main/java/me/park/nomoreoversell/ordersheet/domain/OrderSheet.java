@@ -81,11 +81,6 @@ public class OrderSheet extends BaseTimeEntity {
                 .build();
     }
 
-    public void markReady() {
-        this.status = OrderSheetStatus.READY;
-        this.failureReason = null;
-    }
-
     public void markApproving() {
         this.status = OrderSheetStatus.APPROVING;
         this.failureReason = null;
@@ -99,10 +94,6 @@ public class OrderSheet extends BaseTimeEntity {
     public void markFailed(OrderSheetFailureReason failureReason) {
         this.status = OrderSheetStatus.FAILED;
         this.failureReason = failureReason;
-    }
-
-    public boolean isReady() {
-        return status == OrderSheetStatus.READY;
     }
 
     public boolean isApproving() {

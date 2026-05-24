@@ -25,29 +25,20 @@ class OrderSheetTest {
     }
 
     @Test
-    @DisplayName("주문서를 결제 준비 상태로 변경한다")
-    void markReadyChangesStatusToReady() {
+    @DisplayName("주문서 상태는 현재 주문 생성 흐름에서 사용하는 상태만 가진다")
+    void orderSheetStatusContainsOnlyCurrentOrderFlowStates() {
         // given
-        var orderSheet = orderSheet();
 
-        // when
-        orderSheet.markReady();
+        // when & then
+        assertThat(OrderSheetStatus.values())
+                .containsExactly(
+                        OrderSheetStatus.CREATED,
+                        OrderSheetStatus.APPROVING,
+                        OrderSheetStatus.CONFIRMED,
+                        OrderSheetStatus.FAILED,
+                        OrderSheetStatus.EXPIRED
+                );
 
-        // then
-        assertThat(orderSheet.isReady()).isTrue();
-    }
-
-    @Test
-    @DisplayName("주문서가 결제 준비 상태가 아니면 false를 반환한다")
-    void isReadyReturnsFalseWhenStatusIsNotReady() {
-        // given
-        var orderSheet = orderSheet();
-
-        // when
-        var result = orderSheet.isReady();
-
-        // then
-        assertThat(result).isFalse();
     }
 
     @Test
