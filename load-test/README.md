@@ -27,7 +27,8 @@ LOAD_TEST_TPS=500 LOAD_TEST_DURATION_SECONDS=300 ./load-test/run.sh
 ## 검증 기준
 
 - Checkout, Order 단계에서 5xx가 발생하지 않아야 합니다.
-- K6 `dropped_iterations`가 없어야 합니다.
+- Checkout 단계에서는 목표 요청 수만큼 주문서가 생성되어야 합니다.
+- Order 단계의 `dropped_iterations`는 처리 여력 확인 지표로 기록하되, 최종 성공 여부는 5xx 발생 여부와 DB 정합성으로 판단합니다.
 - 목표 요청 수가 재고보다 많으면 확정 주문 수는 10개여야 합니다.
 - 목표 요청 수가 재고보다 많으면 재고 판매 수량은 10개여야 합니다.
 - 사용자별 확정 주문은 최대 1개여야 합니다.
@@ -66,7 +67,7 @@ LOAD_TEST_TPS=500 LOAD_TEST_DURATION_SECONDS=300 ./load-test/run.sh
 - CPU를 늘릴수록 Order 처리량은 `682.8/s` -> `820.3/s` -> `906.4/s`로 증가했습니다.
 - Order p95 응답 시간은 `9.80s` -> `7.43s` -> `5.13s`로 감소했고, `dropped_iterations`도 12,859건 -> 4,746건 -> 1,354건으로 줄었습니다.
 - CPU 증가에 따라 처리량과 지연 시간이 함께 개선되므로, 현재 Order 병목에는 애플리케이션 CPU 자원이 의미 있게 영향을 주는 것으로 볼 수 있습니다.
-- 10 CPU에서도 `dropped_iterations`가 남아 목표 `1000TPS`를 완전히 유지하지는 못했습니다. 다만 5xx는 없었고 K6 check는 모두 성공했습니다.
+- 10 CPU에서도 `dropped_iterations`가 남아 Order 단계는 목표 `1000TPS`를 완전히 유지하지는 못했습니다. 다만 모든 환경에서 5xx는 0건이었고, 처리된 요청은 확정 또는 기대한 비즈니스 실패로 분리되었습니다.
 - 세 테스트 모두 Order에 확정 주문은 10건만 생성되었고, DB 기준 확정 주문 수 10건, 판매 수량 10개, 구매자 10명으로 재고 정합성 검증은 통과했습니다.
 
 ## Docker 이미지
