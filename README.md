@@ -7,8 +7,9 @@
 
 - [기술 스택](#-기술-스택)
 - [프로젝트 구조](#-프로젝트-구조)
+- [실행 방법](#-실행-방법)
 - [로컬 실행](#-로컬-실행)
-- [Docker 이미지 실행](#-docker-이미지-실행)
+- [Docker 실행](#-docker-실행)
 - [API 명세](#-api-명세)
 - [예약/결제 흐름](#-예약결제-흐름)
 - [ERD](#-erd)
@@ -23,7 +24,7 @@
 - **Language:** Java 21
 - **Framework:** Spring Boot 3.5
 - **Data:** Spring Data JPA, QueryDSL, Flyway, MySQL 8.4
-- **Cache & Lock:** Redis 8.6.3
+- **Cache:** Redis 8.6.3
 - **Stability:** Resilience4j Circuit Breaker
 - **Test:** Testcontainers, K6
 
@@ -54,33 +55,16 @@ http                       # 수동 API 호출 테스트 파일 (.http)
 
 ---
 
-## 🚀 로컬 실행
+## ▶️ 실행 방법
 
-### 1. 필요 도구
+목적에 맞게 두 가지 방법 중 하나를 선택하세요.
 
-- JDK 21
-- Docker / Docker Compose
+- **[로컬 실행](#-로컬-실행)** — 인프라(MySQL·Redis)만 Docker로 띄우고, 앱은 Gradle로 직접 실행합니다. 코드 수정·디버깅 등 개발에 권장합니다.
+- **[Docker 실행](#-docker-실행)** — 앱까지 모두 컨테이너로 실행합니다. JDK 설치 없이 동작만 확인할 때 권장합니다.
 
-### 2. Infra 컨테이너(MySQL, Redis) 실행
+> 💡 어느 방법이든 앱이 기동되면 **Flyway**가 자동으로 DB 마이그레이션(DDL)과 로컬 테스트용 Seed Data를 적재합니다.
 
-```bash
-docker compose up -d mysql redis
-```
-
-- **MySQL:** `localhost:3306`
-- **Redis:** `localhost:6379`
-
-### 3. 애플리케이션 실행
-
-```bash
-./gradlew bootRun
-```
-
-- **Application:** `localhost:8080`
-
-> 💡 애플리케이션이 구동되면 **Flyway**에 의해 자동으로 데이터베이스 마이그레이션(DDL) 및 로컬 테스트용 Seed Data가 적재됩니다.
-
-#### 📊 로컬 Seed Data 주요 정보
+#### 📊 Seed Data 주요 정보
 
 | 구분              | 값                                     |
 |-----------------|---------------------------------------|
@@ -90,35 +74,78 @@ docker compose up -d mysql redis
 
 ---
 
-## 🐳 Docker 이미지 실행
+## 🚀 로컬 실행
 
-### 1. 이미지 빌드
+> 인프라(MySQL·Redis)는 Docker로 띄우고, 애플리케이션은 Gradle로 직접 실행하는 방법입니다.
+
+### 1. 사전 준비
+
+- JDK 21
+- Docker / Docker Compose
+
+### 2. 인프라 컨테이너(MySQL·Redis) 실행
 
 ```bash
-docker build -t no-more-oversell:local .
+docker compose up -d mysql redis
 ```
 
-### 2. Infra 컨테이너 실행
+| 서비스   | 주소                |
+|-------|-------------------|
+| MySQL | `localhost:3306`  |
+| Redis | `localhost:6379`  |
 
-애플리케이션 컨테이너가 Compose 네트워크 내부에서 `mysql`, `redis` 서비스명으로 연동되도록 프로젝트 네임을 고정하여 실행합니다.
+### 3. 애플리케이션 실행
 
 ```bash
-COMPOSE_PROJECT_NAME=no-more-oversell docker compose up -d mysql redis
+./gradlew bootRun
 ```
 
-### 3. 앱 컨테이너 실행
+- 기동이 완료되면 `http://localhost:8080` 에서 동작합니다.
+
+### 4. 동작 확인 (선택)
 
 ```bash
-docker run --rm \
-  --name no-more-oversell-app \
-  --network no-more-oversell_default \
-  -p 8080:8080 \
-  -e SPRING_DATASOURCE_URL='jdbc:mysql://mysql:3306/no_more_oversell?serverTimezone=Asia/Seoul&characterEncoding=UTF-8' \
-  -e SPRING_DATASOURCE_USERNAME=no_more_oversell \
-  -e SPRING_DATASOURCE_PASSWORD=no_more_oversell \
-  -e SPRING_DATA_REDIS_HOST=redis \
-  -e SPRING_DATA_REDIS_PORT=6379 \
-  no-more-oversell:local
+curl 'http://localhost:8080/api/checkout?stayProductId=900001' -H 'userId: 900001'
+```
+
+### 5. 종료
+
+```bash
+docker compose down       # 인프라 컨테이너 중지
+docker compose down -v    # MySQL 데이터 볼륨까지 삭제
+```
+
+---
+
+## 🐳 Docker 실행
+
+> 애플리케이션까지 전부 컨테이너로 실행하는 방법입니다. JDK 설치가 필요 없습니다.
+
+### 1. 사전 준비
+
+- Docker / Docker Compose
+
+### 2. 앱과 인프라 실행
+
+```bash
+./scripts/run-app.sh
+```
+
+이 스크립트는 `docker-compose.yml`의 MySQL·Redis와 `docker-compose.app.yml`의 앱 컨테이너를 함께 실행합니다.
+이미지는 로컬에서 자동으로 빌드됩니다.
+
+### 3. 동작 확인 (선택)
+
+```bash
+curl 'http://localhost:8080/api/checkout?stayProductId=900001' -H 'userId: 900001'
+```
+
+### 4. 종료
+
+```bash
+# 앱 로그 화면은 Ctrl+C로 종료합니다.
+docker compose -f docker-compose.yml -f docker-compose.app.yml down
+docker compose -f docker-compose.yml -f docker-compose.app.yml down -v  # MySQL 데이터 볼륨까지 삭제
 ```
 
 ---
@@ -129,7 +156,8 @@ docker run --rm \
 
 ### 1. Checkout (주문서 발행)
 
-상품 정보, 실시간 재고 여부, 유저 가용 포인트를 조회하고 주문을 위한 토큰을 발급합니다.
+상품 정보와 실시간 재고를 확인하고, 재고가 있으면 유저 가용 포인트를 조회한 뒤 주문을 위한 토큰을 발급합니다.
+재고가 없으면 주문서 토큰을 발급하지 않고 `SOLD_OUT`으로 응답합니다.
 
 - **HTTP Method & URL:** `GET /api/checkout`
 - **Request Example:**
@@ -223,13 +251,12 @@ curl -X POST 'http://localhost:8080/api/orders' \
 
 - `SOLD_OUT`: 상품 품절
 - `ORDER_IN_PROGRESS`: 현재 주문 처리 중
-- `PAYMENT_FAILED`: PG사 결제 승인 실패
+- `PAYMENT_FAILED`: PG사 결제 승인 실패 또는 포인트 잔액 부족
 - `INVALID_PAYMENT_COMBINATION`: 결제 금액 불일치 혹은 잘못된 조합
 - `PURCHASE_LIMIT_EXCEEDED`: 유저당 최대 구매 수량 초과
 - `INVALID_ORDER_SHEET_STATE`: 유효하지 않은 주문서 상태
 - `ORDER_SHEET_OWNER_MISMATCH`: 주문서 생성자와 요청자 불일치
 - `PRODUCT_NOT_OPEN`: 상품 판매 기간이 아님
-- `INSUFFICIENT_POINT_BALANCE`: 포인트 잔액 부족
 
 ---
 
@@ -251,14 +278,19 @@ sequenceDiagram
     OrderSheetService ->> Redis: checkout response 조회 (Circuit Breaker)
     alt cache hit
         Redis -->> OrderSheetService: CheckoutResponse (기존 orderSheetToken 반환)
+        OrderSheetService -->> Client: orderSheetToken 포함 checkout 응답
     else cache miss or Redis fallback
         OrderSheetService ->> MySQL: 상품 조회 및 오픈 여부 검증
         OrderSheetService ->> MySQL: 재고 여부 조회
-        OrderSheetService ->> MySQL: 포인트 잔액 조회
-        OrderSheetService ->> MySQL: order_sheet CREATED 저장
-        OrderSheetService --) Redis: checkout response 비동기 저장 (Circuit Breaker)
+        alt sold out
+            OrderSheetService -->> Client: SOLD_OUT
+        else has stock
+            OrderSheetService ->> MySQL: 포인트 잔액 조회
+            OrderSheetService ->> MySQL: order_sheet CREATED 저장
+            OrderSheetService --) Redis: checkout response 비동기 저장 (Circuit Breaker)
+            OrderSheetService -->> Client: orderSheetToken 포함 checkout 응답
+        end
     end
-    OrderSheetService -->> Client: orderSheetToken 포함 checkout 응답
 ```
 
 ### 2. POST /api/orders
@@ -415,7 +447,8 @@ erDiagram
 
 ## 🧪 테스트 검증
 
-통합 테스트의 경우 **Testcontainers**를 이용하여 실제 MySQL 환경과 유기적으로 매핑하여 실행됩니다.
+통합 테스트는 **Testcontainers**로 MySQL 컨테이너를 띄워 실행합니다.
+H2 같은 대체 DB가 아니라 실제 운영과 동일한 MySQL 계열 데이터베이스 엔진에서 JPA 매핑, Flyway DDL, unique/check 제약, 비관적 락 동작을 함께 검증합니다.
 
 - **단위 테스트 수행:**
   ```bash

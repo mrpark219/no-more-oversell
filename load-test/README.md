@@ -4,14 +4,14 @@
 - 여기서는 별도의 환경 구성 없이 Docker, Docker Compose를 통해 쉽게 테스트를 실행할 수 있습니다.
 
 ```bash
-./load-test/run.sh
+./run.sh
 ```
 
 - 기본값은 Checkout API를 `1000TPS x 60초`로 호출한 뒤, 생성된 주문서 토큰을 사용해 Order API를 `1000TPS x 60초`로 이어서 호출합니다.
   TPS와 지속 시간은 환경변수로 변경할 수 있습니다.
 
 ```bash
-LOAD_TEST_TPS=500 LOAD_TEST_DURATION_SECONDS=300 ./load-test/run.sh
+LOAD_TEST_TPS=500 LOAD_TEST_DURATION_SECONDS=300 ./run.sh
 ```
 
 ## 테스트 흐름
@@ -76,20 +76,20 @@ LOAD_TEST_TPS=500 LOAD_TEST_DURATION_SECONDS=300 ./load-test/run.sh
 이미 `no-more-oversell-load-test-app:latest` 이미지가 있으면 재사용하고, 없으면 한 번만 빌드합니다.
 
 ```bash
-BUILD_IMAGE=auto ./load-test/run.sh
+BUILD_IMAGE=auto ./run.sh
 ```
 
 애플리케이션 코드를 변경한 뒤 새 이미지가 필요하면 강제로 빌드합니다.
 
 ```bash
-BUILD_IMAGE=true ./load-test/run.sh
+BUILD_IMAGE=true ./run.sh
 ```
 
 기존 이미지만 사용하고 싶으면 빌드를 끌 수 있습니다.
 이 경우 이미지가 없으면 실행을 중단합니다.
 
 ```bash
-BUILD_IMAGE=false ./load-test/run.sh
+BUILD_IMAGE=false ./run.sh
 ```
 
 ## 결과 파일

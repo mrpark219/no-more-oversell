@@ -57,9 +57,9 @@ userId: {{userId}}
   ]
 }
 
-### 4. 체크아웃 - 품절 상품 주문서 토큰 발급 시도
+### 4. 체크아웃 - 품절 상품 주문서 생성 실패
 # 재고가 없는 품절 상품으로 체크아웃을 요청한다.
-# 품절 상태이므로 주문서 토큰 발급이 거부되어야 한다.
+# 품절 상태이므로 주문서 토큰 생성에 실패하고 SOLD_OUT 응답이 내려와야 한다.
 GET {{host}}/api/checkout?stayProductId={{soldOutStayProductId}}
 userId: {{userId}}
 

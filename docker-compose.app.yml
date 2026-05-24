@@ -1,0 +1,35 @@
+services:
+  mysql:
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u no_more_oversell -pno_more_oversell --silent" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: no-more-oversell:local
+    container_name: no-more-oversell-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/no_more_oversell?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: no_more_oversell
+      SPRING_DATASOURCE_PASSWORD: no_more_oversell
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
