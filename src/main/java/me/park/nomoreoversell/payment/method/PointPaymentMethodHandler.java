@@ -20,7 +20,7 @@ public class PointPaymentMethodHandler implements PaymentMethodHandler {
 
     @Override
     public PaymentApprovalResult approve(PaymentApprovalRequest request) {
-        if (!pointService.deductIfEnough(request.userId(), request.amount())) {
+        if (!pointService.deductIfBalanceEnough(request.userId(), request.amount())) {
             return PaymentApprovalResult.fail("INSUFFICIENT_POINT_BALANCE");
         }
         return PaymentApprovalResult.success(transactionKey(request.userId(), request.amount()));
@@ -28,7 +28,7 @@ public class PointPaymentMethodHandler implements PaymentMethodHandler {
 
     @Override
     public PaymentCancelResult cancel(PaymentApprovalRequest request, PaymentApprovalResult approvalResult, String reason) {
-        pointService.restore(request.userId(), request.amount());
+        pointService.restoreBalance(request.userId(), request.amount());
         log.info("포인트 결제 취소 완료. userId={}, amount={}, reason={}", request.userId(), request.amount(), reason);
         return PaymentCancelResult.success(approvalResult.transactionKey());
     }

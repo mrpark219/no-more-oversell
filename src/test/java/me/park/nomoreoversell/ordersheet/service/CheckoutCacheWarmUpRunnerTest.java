@@ -51,9 +51,9 @@ class CheckoutCacheWarmUpRunnerTest {
         runner.run(null);
 
         // then
-        verify(stayProductService).warmUp(1L);
-        verify(stayProductService).warmUp(2L);
-        verify(inventoryService).warmUpSoldOutHint(1L);
-        verify(inventoryService).warmUpSoldOutHint(2L);
+        verify(stayProductService).warmUpCache(1L);
+        verify(stayProductService).warmUpCache(2L);
+        verify(inventoryService).warmUpSoldOutHintCache(1L);
+        verify(inventoryService).warmUpSoldOutHintCache(2L);
     }
 }

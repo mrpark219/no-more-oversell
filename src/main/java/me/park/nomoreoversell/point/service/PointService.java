@@ -18,13 +18,13 @@ public class PointService {
     private final PointBalanceCache pointBalanceCache;
 
     @Transactional(readOnly = true)
-    public long available(Long userId) {
+    public long getAvailableBalance(Long userId) {
         return pointBalanceCache.get(userId)
-                .orElseGet(() -> getAvailablePointFromRepository(userId));
+                .orElseGet(() -> loadAvailableBalanceAndCache(userId));
     }
 
     @Transactional
-    public void deduct(Long userId, long amount) {
+    public void deductBalance(Long userId, long amount) {
         log.info("포인트 차감 시도. userId={}, amount={}", userId, amount);
 
         var point = pointRepository.getByUserIdWithLock(userId)
@@ -39,7 +39,7 @@ public class PointService {
     }
 
     @Transactional
-    public boolean deductIfEnough(Long userId, long amount) {
+    public boolean deductIfBalanceEnough(Long userId, long amount) {
         log.info("포인트 차감 시도. userId={}, amount={}", userId, amount);
 
         var point = pointRepository.getByUserIdWithLock(userId)
@@ -69,7 +69,7 @@ public class PointService {
     }
 
     @Transactional
-    public void restore(Long userId, long amount) {
+    public void restoreBalance(Long userId, long amount) {
         log.info("포인트 복구 시도. userId={}, amount={}", userId, amount);
 
         var point = pointRepository.getByUserIdWithLock(userId)
@@ -83,7 +83,7 @@ public class PointService {
         log.info("포인트 복구 성공. userId={}, amount={}, balance={}", userId, amount, point.getBalance());
     }
 
-    private long getAvailablePointFromRepository(Long userId) {
+    private long loadAvailableBalanceAndCache(Long userId) {
         log.debug("포인트 잔액 조회 시도. userId={}", userId);
 
         var balance = pointRepository.findByUserId(userId)

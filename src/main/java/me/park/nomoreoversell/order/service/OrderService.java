@@ -83,115 +83,11 @@ public class OrderService {
                 throw new InvalidOrderSheetStateException();
             }
 
-            var stayProduct = stayProductService.getOpenFromRepository(request.stayProductId());
+            var stayProduct = stayProductService.getOpenViewWithoutCache(request.stayProductId());
             paymentPlanValidator.validate(orderSheet.getSalePrice(), paymentDetailRequests(request.paymentDetails()));
             orderSheet.markApproving();
             return OrderPreparation.newOrder(orderSheet, stayProduct);
         });
-    }
-
-    private CreateOrderResponse confirmApprovedOrder(Long orderSheetId, StayProductView stayProduct, Payment payment) {
-        return transactionTemplate.execute(status -> {
-            var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
-                    .orElseThrow(OrderSheetNotFoundException::new);
-            if (orderSheet.isConfirmed()) {
-                return findConfirmedOrder(orderSheet);
-            }
-            if (!orderSheet.isApproving()) {
-                throw new InvalidOrderSheetStateException();
-            }
-
-            inventoryService.reserveOne(orderSheet.getProductId());
-            validatePurchaseLimit(orderSheet, stayProduct);
-            paymentRepository.save(payment);
-
-            var order = orderRepository.save(Order.confirmed(
-                    orderSheet.getId(),
-                    orderSheet.getUserId(),
-                    orderSheet.getProductId(),
-                    orderSheet.getOriginalPrice(),
-                    orderSheet.getSalePrice()
-            ));
-            orderSheet.markConfirmed();
-
-            log.info(
-                    "주문 생성 완료. orderId={}, orderSheetId={}, userId={}, productId={}",
-                    order.getId(),
-                    orderSheet.getId(),
-                    orderSheet.getUserId(),
-                    orderSheet.getProductId()
-            );
-            return CreateOrderResponse.from(order, orderSheet.getOrderSheetToken(), stayProduct, payment);
-        });
-    }
-
-    private void markOrderSheetFailed(Long orderSheetId, OrderSheetFailureReason failureReason) {
-        transactionTemplate.execute(status -> {
-            var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
-                    .orElseThrow(OrderSheetNotFoundException::new);
-            orderSheet.markFailed(failureReason);
-            return null;
-        });
-    }
-
-    private void recordFailedConfirmation(Long orderSheetId, Payment payment, OrderSheetFailureReason failureReason) {
-        transactionTemplate.execute(status -> {
-            var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
-                    .orElseThrow(OrderSheetNotFoundException::new);
-            orderSheet.markFailed(failureReason);
-            paymentRepository.save(payment);
-            return null;
-        });
-    }
-
-    private OrderSheetFailureReason failureReason(RuntimeException exception) {
-        if (exception instanceof SoldOutException) {
-            return OrderSheetFailureReason.SOLD_OUT;
-        }
-        if (exception instanceof PurchaseLimitExceededException) {
-            return OrderSheetFailureReason.PURCHASE_LIMIT_EXCEEDED;
-        }
-        return OrderSheetFailureReason.ORDER_CONFIRM_FAILED;
-    }
-
-    private CreateOrderResponse findConfirmedOrder(OrderSheet orderSheet) {
-        var stayProduct = stayProductService.getFromRepository(orderSheet.getProductId());
-        var order = orderRepository.findByOrderSheetId(orderSheet.getId())
-                .orElseThrow(InvalidOrderSheetStateException::new);
-        var payment = paymentRepository.findByOrderSheetId(orderSheet.getId())
-                .orElseThrow(InvalidOrderSheetStateException::new);
-        return CreateOrderResponse.from(order, orderSheet.getOrderSheetToken(), stayProduct, payment);
-    }
-
-    private void validateRequestMatchesOrderSheet(CreateOrderRequest request, OrderSheet orderSheet) {
-        if (!orderSheet.getUserId().equals(request.userId())) {
-            throw new OrderSheetOwnerMismatchException();
-        }
-        if (!orderSheet.getProductId().equals(request.stayProductId())) {
-            throw new InvalidOrderSheetStateException();
-        }
-    }
-
-    private void validatePurchaseLimit(OrderSheet orderSheet, StayProductView stayProduct) {
-        if (stayProduct.maxPerUser() == null) {
-            return;
-        }
-
-        var confirmedOrderCount = orderRepository.countByUserIdAndProductIdAndStatus(
-                orderSheet.getUserId(),
-                orderSheet.getProductId(),
-                OrderStatus.CONFIRMED
-        );
-        if (confirmedOrderCount >= stayProduct.maxPerUser()) {
-            log.info(
-                    "인당 구매 제한 초과. userId={}, productId={}, confirmedOrderCount={}, maxPerUser={}",
-                    orderSheet.getUserId(),
-                    orderSheet.getProductId(),
-                    confirmedOrderCount,
-                    stayProduct.maxPerUser()
-            );
-            throw new PurchaseLimitExceededException();
-        }
     }
 
     private Payment approvePayment(CreateOrderRequest request, OrderSheet orderSheet) {
@@ -229,6 +125,50 @@ public class OrderService {
         }
     }
 
+    private CreateOrderResponse confirmApprovedOrder(Long orderSheetId, StayProductView stayProduct, Payment payment) {
+        return transactionTemplate.execute(status -> {
+            var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
+                    .orElseThrow(OrderSheetNotFoundException::new);
+            if (orderSheet.isConfirmed()) {
+                return findConfirmedOrder(orderSheet);
+            }
+            if (!orderSheet.isApproving()) {
+                throw new InvalidOrderSheetStateException();
+            }
+
+            inventoryService.reserveOneStock(orderSheet.getProductId());
+            validatePurchaseLimit(orderSheet, stayProduct);
+            paymentRepository.save(payment);
+
+            var order = orderRepository.save(Order.confirmed(
+                    orderSheet.getId(),
+                    orderSheet.getUserId(),
+                    orderSheet.getProductId(),
+                    orderSheet.getOriginalPrice(),
+                    orderSheet.getSalePrice()
+            ));
+            orderSheet.markConfirmed();
+
+            log.info(
+                    "주문 생성 완료. orderId={}, orderSheetId={}, userId={}, productId={}",
+                    order.getId(),
+                    orderSheet.getId(),
+                    orderSheet.getUserId(),
+                    orderSheet.getProductId()
+            );
+            return CreateOrderResponse.from(order, orderSheet.getOrderSheetToken(), stayProduct, payment);
+        });
+    }
+
+    private void markOrderSheetFailed(Long orderSheetId, OrderSheetFailureReason failureReason) {
+        transactionTemplate.execute(status -> {
+            var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
+                    .orElseThrow(OrderSheetNotFoundException::new);
+            orderSheet.markFailed(failureReason);
+            return null;
+        });
+    }
+
     private void cancelApprovedPayment(Long userId, Payment payment, String reason) {
         var approvedPayments = payment.orderedDetails().stream()
                 .map(detail -> new ApprovedPayment(
@@ -262,6 +202,66 @@ public class OrderService {
             return;
         }
         payment.markCanceled();
+    }
+
+    private void recordFailedConfirmation(Long orderSheetId, Payment payment, OrderSheetFailureReason failureReason) {
+        transactionTemplate.execute(status -> {
+            var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
+                    .orElseThrow(OrderSheetNotFoundException::new);
+            orderSheet.markFailed(failureReason);
+            paymentRepository.save(payment);
+            return null;
+        });
+    }
+
+    private OrderSheetFailureReason failureReason(RuntimeException exception) {
+        if (exception instanceof SoldOutException) {
+            return OrderSheetFailureReason.SOLD_OUT;
+        }
+        if (exception instanceof PurchaseLimitExceededException) {
+            return OrderSheetFailureReason.PURCHASE_LIMIT_EXCEEDED;
+        }
+        return OrderSheetFailureReason.ORDER_CONFIRM_FAILED;
+    }
+
+    private void validateRequestMatchesOrderSheet(CreateOrderRequest request, OrderSheet orderSheet) {
+        if (!orderSheet.getUserId().equals(request.userId())) {
+            throw new OrderSheetOwnerMismatchException();
+        }
+        if (!orderSheet.getProductId().equals(request.stayProductId())) {
+            throw new InvalidOrderSheetStateException();
+        }
+    }
+
+    private void validatePurchaseLimit(OrderSheet orderSheet, StayProductView stayProduct) {
+        if (stayProduct.maxPerUser() == null) {
+            return;
+        }
+
+        var confirmedOrderCount = orderRepository.countByUserIdAndProductIdAndStatus(
+                orderSheet.getUserId(),
+                orderSheet.getProductId(),
+                OrderStatus.CONFIRMED
+        );
+        if (confirmedOrderCount >= stayProduct.maxPerUser()) {
+            log.info(
+                    "인당 구매 제한 초과. userId={}, productId={}, confirmedOrderCount={}, maxPerUser={}",
+                    orderSheet.getUserId(),
+                    orderSheet.getProductId(),
+                    confirmedOrderCount,
+                    stayProduct.maxPerUser()
+            );
+            throw new PurchaseLimitExceededException();
+        }
+    }
+
+    private CreateOrderResponse findConfirmedOrder(OrderSheet orderSheet) {
+        var stayProduct = stayProductService.getViewWithoutCache(orderSheet.getProductId());
+        var order = orderRepository.findByOrderSheetId(orderSheet.getId())
+                .orElseThrow(InvalidOrderSheetStateException::new);
+        var payment = paymentRepository.findByOrderSheetId(orderSheet.getId())
+                .orElseThrow(InvalidOrderSheetStateException::new);
+        return CreateOrderResponse.from(order, orderSheet.getOrderSheetToken(), stayProduct, payment);
     }
 
     private List<PaymentDetailRequest> paymentDetailRequests(List<CreateOrderPaymentRequest> paymentDetails) {

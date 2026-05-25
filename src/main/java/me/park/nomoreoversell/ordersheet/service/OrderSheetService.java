@@ -10,6 +10,7 @@ import me.park.nomoreoversell.point.service.PointService;
 import me.park.nomoreoversell.stayproduct.service.StayProductService;
 import me.park.nomoreoversell.stayproduct.service.StayProductView;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -24,14 +25,15 @@ public class OrderSheetService {
     private final PointService pointService;
     private final CheckoutResponseCache checkoutResponseCache;
 
-    public CheckoutResponse checkout(CheckoutRequest request) {
+    @Transactional
+    public CheckoutResponse prepareCheckout(CheckoutRequest request) {
         return checkoutResponseCache.get(request.userId(), request.stayProductId())
                 .orElseGet(() -> createCheckoutResponse(request));
     }
 
     private CheckoutResponse createCheckoutResponse(CheckoutRequest request) {
-        var stayProduct = stayProductService.getOpen(request.stayProductId());
-        var hasStock = inventoryService.hasStock(request.stayProductId());
+        var stayProduct = stayProductService.getOpenView(request.stayProductId());
+        var hasStock = inventoryService.hasAvailableStock(request.stayProductId());
         if (!hasStock) {
             log.info(
                     "체크아웃 주문서 생성 실패: 재고가 없습니다. userId={}, stayProductId={}",
@@ -40,7 +42,7 @@ public class OrderSheetService {
             );
             throw new SoldOutException();
         }
-        var availablePoint = pointService.available(request.userId());
+        var availablePoint = pointService.getAvailableBalance(request.userId());
         var orderSheet = createOrderSheet(request, stayProduct);
 
         var response = CheckoutResponse.builder()

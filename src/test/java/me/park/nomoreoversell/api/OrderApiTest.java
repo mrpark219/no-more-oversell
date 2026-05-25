@@ -59,7 +59,7 @@ class OrderApiTest {
     @DisplayName("체크아웃 API는 userId 헤더와 상품 ID 파라미터로 주문서를 조회한다")
     void checkoutReturnsOrderSheet() throws Exception {
         // given
-        given(orderSheetService.checkout(new CheckoutRequest(1L, 10L)))
+        given(orderSheetService.prepareCheckout(new CheckoutRequest(1L, 10L)))
                 .willReturn(checkoutResponse());
 
         // when & then
@@ -73,7 +73,7 @@ class OrderApiTest {
                 .andExpect(jsonPath("$.stayProduct.hasStock").value(true))
                 .andExpect(jsonPath("$.user.availablePoint").value(5000));
 
-        verify(orderSheetService).checkout(new CheckoutRequest(1L, 10L));
+        verify(orderSheetService).prepareCheckout(new CheckoutRequest(1L, 10L));
     }
 
     @Test
@@ -175,7 +175,7 @@ class OrderApiTest {
     @DisplayName("공통 예외 응답은 비즈니스 예외의 코드와 메시지를 내려준다")
     void apiExceptionReturnsErrorResponse() throws Exception {
         // given
-        given(orderSheetService.checkout(new CheckoutRequest(1L, 10L)))
+        given(orderSheetService.prepareCheckout(new CheckoutRequest(1L, 10L)))
                 .willThrow(new SoldOutException());
 
         // when & then

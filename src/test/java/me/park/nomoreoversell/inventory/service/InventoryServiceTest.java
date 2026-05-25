@@ -33,14 +33,14 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("재고가 있으면 1개를 예약한다")
-    void reserveOneIncreasesSoldQuantityWhenInventoryExists() {
+    void reserveOneStockIncreasesSoldQuantityWhenInventoryExists() {
         // given
         var inventory = inventory(10L, 0L);
         given(inventoryRepository.getByProductIdWithLock(1L))
                 .willReturn(Optional.of(inventory));
 
         // when
-        inventoryService.reserveOne(1L);
+        inventoryService.reserveOneStock(1L);
 
         // then
         assertThat(inventory.getSoldQuantity()).isEqualTo(1L);
@@ -48,14 +48,14 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("재고 예약으로 판매 가능 수량이 0개가 되면 마감 힌트 캐시를 저장한다")
-    void reserveOneMarksSoldOutCacheWhenRemainingQuantityBecomesZero() {
+    void reserveOneStockMarksSoldOutCacheWhenRemainingQuantityBecomesZero() {
         // given
         var inventory = inventory(10L, 9L);
         given(inventoryRepository.getByProductIdWithLock(1L))
                 .willReturn(Optional.of(inventory));
 
         // when
-        inventoryService.reserveOne(1L);
+        inventoryService.reserveOneStock(1L);
 
         // then
         assertThat(inventory.getSoldQuantity()).isEqualTo(10L);
@@ -64,13 +64,13 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("재고가 없으면 예약할 수 없다")
-    void reserveOneThrowsExceptionWhenInventoryDoesNotExist() {
+    void reserveOneStockThrowsExceptionWhenInventoryDoesNotExist() {
         // given
         given(inventoryRepository.getByProductIdWithLock(1L))
                 .willReturn(Optional.empty());
 
         // when
-        var thrown = catchThrowable(() -> inventoryService.reserveOne(1L));
+        var thrown = catchThrowable(() -> inventoryService.reserveOneStock(1L));
 
         // then
         assertThat(thrown)
@@ -79,14 +79,14 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("판매 가능한 재고가 없으면 예약할 수 없다")
-    void reserveOneThrowsExceptionWhenInventoryIsSoldOut() {
+    void reserveOneStockThrowsExceptionWhenInventoryIsSoldOut() {
         // given
         var inventory = inventory(10L, 10L);
         given(inventoryRepository.getByProductIdWithLock(1L))
                 .willReturn(Optional.of(inventory));
 
         // when
-        var thrown = catchThrowable(() -> inventoryService.reserveOne(1L));
+        var thrown = catchThrowable(() -> inventoryService.reserveOneStock(1L));
 
         // then
         assertThat(thrown)
@@ -96,7 +96,7 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("재고가 있으면 판매 가능 여부를 true로 반환한다")
-    void hasStockReturnsTrueWhenInventoryHasQuantity() {
+    void hasAvailableStockReturnsTrueWhenInventoryHasQuantity() {
         // given
         given(productSoldOutCache.isSoldOut(1L))
                 .willReturn(false);
@@ -104,7 +104,7 @@ class InventoryServiceTest {
                 .willReturn(Optional.of(inventory(10L, 9L)));
 
         // when
-        var result = inventoryService.hasStock(1L);
+        var result = inventoryService.hasAvailableStock(1L);
 
         // then
         assertThat(result).isTrue();
@@ -112,7 +112,7 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("재고가 없으면 판매 가능 여부를 false로 반환한다")
-    void hasStockReturnsFalseWhenInventoryDoesNotExist() {
+    void hasAvailableStockReturnsFalseWhenInventoryDoesNotExist() {
         // given
         given(productSoldOutCache.isSoldOut(1L))
                 .willReturn(false);
@@ -120,7 +120,7 @@ class InventoryServiceTest {
                 .willReturn(Optional.empty());
 
         // when
-        var result = inventoryService.hasStock(1L);
+        var result = inventoryService.hasAvailableStock(1L);
 
         // then
         assertThat(result).isFalse();
@@ -128,13 +128,13 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("마감 힌트 캐시가 있으면 DB를 조회하지 않고 판매 불가로 반환한다")
-    void hasStockReturnsFalseWithoutRepositoryLookupWhenSoldOutCacheExists() {
+    void hasAvailableStockReturnsFalseWithoutRepositoryLookupWhenSoldOutCacheExists() {
         // given
         given(productSoldOutCache.isSoldOut(1L))
                 .willReturn(true);
 
         // when
-        var result = inventoryService.hasStock(1L);
+        var result = inventoryService.hasAvailableStock(1L);
 
         // then
         assertThat(result).isFalse();
@@ -143,14 +143,14 @@ class InventoryServiceTest {
 
     @Test
     @DisplayName("판매 수량이 있으면 재고를 복구한다")
-    void restoreOneDecreasesSoldQuantityWhenSoldQuantityExists() {
+    void restoreOneStockDecreasesSoldQuantityWhenSoldQuantityExists() {
         // given
         var inventory = inventory(10L, 1L);
         given(inventoryRepository.getByProductIdWithLock(1L))
                 .willReturn(Optional.of(inventory));
 
         // when
-        inventoryService.restoreOne(1L);
+        inventoryService.restoreOneStock(1L);
 
         // then
         assertThat(inventory.getSoldQuantity()).isZero();

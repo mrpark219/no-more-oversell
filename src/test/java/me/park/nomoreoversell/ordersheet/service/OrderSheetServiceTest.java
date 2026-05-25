@@ -51,19 +51,19 @@ class OrderSheetServiceTest {
 
     @Test
     @DisplayName("체크아웃 진입 시 상품, 재고, 포인트를 조회하고 주문서 토큰을 발급한다")
-    void checkoutCreatesOrderSheetToken() {
+    void prepareCheckoutCreatesOrderSheetToken() {
         // given
         var userId = 1L;
         var productId = 10L;
         given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.empty());
-        given(stayProductService.getOpen(productId)).willReturn(stayProduct(productId));
-        given(inventoryService.hasStock(productId)).willReturn(true);
-        given(pointService.available(userId)).willReturn(5_000L);
+        given(stayProductService.getOpenView(productId)).willReturn(stayProduct(productId));
+        given(inventoryService.hasAvailableStock(productId)).willReturn(true);
+        given(pointService.getAvailableBalance(userId)).willReturn(5_000L);
         given(orderSheetRepository.save(any(OrderSheet.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        var response = orderSheetService.checkout(new CheckoutRequest(userId, productId));
+        var response = orderSheetService.prepareCheckout(new CheckoutRequest(userId, productId));
 
         // then
         assertThat(response.orderSheetToken()).isNotBlank();
@@ -81,24 +81,24 @@ class OrderSheetServiceTest {
 
     @Test
     @DisplayName("재고가 없으면 체크아웃 주문서를 생성하지 않는다")
-    void checkoutRejectsSoldOutProduct() {
+    void prepareCheckoutRejectsSoldOutProduct() {
         // given
         var userId = 1L;
         var productId = 10L;
         given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.empty());
-        given(stayProductService.getOpen(productId)).willReturn(stayProduct(productId));
-        given(inventoryService.hasStock(productId)).willReturn(false);
+        given(stayProductService.getOpenView(productId)).willReturn(stayProduct(productId));
+        given(inventoryService.hasAvailableStock(productId)).willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> orderSheetService.checkout(new CheckoutRequest(userId, productId)))
+        assertThatThrownBy(() -> orderSheetService.prepareCheckout(new CheckoutRequest(userId, productId)))
                 .isInstanceOf(SoldOutException.class);
-        verify(inventoryService).hasStock(productId);
+        verify(inventoryService).hasAvailableStock(productId);
         verifyNoInteractions(pointService, orderSheetRepository);
     }
 
     @Test
     @DisplayName("같은 사용자가 같은 상품 체크아웃에 재진입하면 Redis 캐시의 응답 값을 반환한다")
-    void checkoutReturnsCachedResponse() {
+    void prepareCheckoutReturnsCachedResponse() {
         // given
         var userId = 1L;
         var productId = 10L;
@@ -106,7 +106,7 @@ class OrderSheetServiceTest {
         given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.of(cachedResponse));
 
         // when
-        var response = orderSheetService.checkout(new CheckoutRequest(userId, productId));
+        var response = orderSheetService.prepareCheckout(new CheckoutRequest(userId, productId));
 
         // then
         assertThat(response).isEqualTo(cachedResponse);
@@ -115,15 +115,15 @@ class OrderSheetServiceTest {
 
     @Test
     @DisplayName("오픈되지 않은 상품은 체크아웃 주문서를 생성하지 않는다")
-    void checkoutRejectsNotOpenProduct() {
+    void prepareCheckoutRejectsNotOpenProduct() {
         // given
         var userId = 1L;
         var productId = 10L;
         given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.empty());
-        given(stayProductService.getOpen(productId)).willThrow(new StayProductNotOpenException());
+        given(stayProductService.getOpenView(productId)).willThrow(new StayProductNotOpenException());
 
         // when & then
-        assertThatThrownBy(() -> orderSheetService.checkout(new CheckoutRequest(userId, productId)))
+        assertThatThrownBy(() -> orderSheetService.prepareCheckout(new CheckoutRequest(userId, productId)))
                 .isInstanceOf(StayProductNotOpenException.class);
         verifyNoInteractions(inventoryService, pointService, orderSheetRepository);
     }

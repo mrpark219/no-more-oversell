@@ -112,7 +112,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.getOpenFromRepository(10L))
+        given(stayProductService.getOpenViewWithoutCache(10L))
                 .willReturn(stayProduct());
         given(orderRepository.countByUserIdAndProductIdAndStatus(1L, 10L, OrderStatus.CONFIRMED))
                 .willReturn(0L);
@@ -156,9 +156,9 @@ class OrderServiceTest {
         var inOrder = inOrder(cardPaymentHandler, pointPaymentHandler, inventoryService, orderRepository);
         inOrder.verify(cardPaymentHandler).approve(any());
         inOrder.verify(pointPaymentHandler).approve(any());
-        inOrder.verify(inventoryService).reserveOne(10L);
+        inOrder.verify(inventoryService).reserveOneStock(10L);
         inOrder.verify(orderRepository).countByUserIdAndProductIdAndStatus(1L, 10L, OrderStatus.CONFIRMED);
-        verify(stayProductService, never()).getOpen(10L);
+        verify(stayProductService, never()).getOpenView(10L);
 
         var paymentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(paymentCaptor.capture());
@@ -175,7 +175,7 @@ class OrderServiceTest {
         var order = confirmedOrder(orderSheet);
         var payment = approvedPayment(orderSheet);
         ReflectionTestUtils.setField(order, "id", 100L);
-        given(stayProductService.getFromRepository(10L))
+        given(stayProductService.getViewWithoutCache(10L))
                 .willReturn(stayProduct());
         given(orderSheetRepository.getByTokenWithLock("sheet-token"))
                 .willReturn(Optional.of(orderSheet));
@@ -192,8 +192,8 @@ class OrderServiceTest {
         assertThat(response.order().status()).isEqualTo(OrderStatus.CONFIRMED);
         assertThat(response.payment().status()).isEqualTo(PaymentStatus.APPROVED);
         verify(paymentRepository, never()).save(any(Payment.class));
-        verify(inventoryService, never()).reserveOne(10L);
-        verify(stayProductService, never()).get(10L);
+        verify(inventoryService, never()).reserveOneStock(10L);
+        verify(stayProductService, never()).getView(10L);
     }
 
     @Test
@@ -206,7 +206,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.getOpenFromRepository(10L))
+        given(stayProductService.getOpenViewWithoutCache(10L))
                 .willReturn(stayProduct());
         given(paymentMethodHandlerFinder.get(PaymentMethod.CARD))
                 .willReturn(cardPaymentHandler);
@@ -228,7 +228,7 @@ class OrderServiceTest {
                 .isInstanceOf(PurchaseLimitExceededException.class);
 
         var inOrder = inOrder(inventoryService, orderRepository);
-        inOrder.verify(inventoryService).reserveOne(10L);
+        inOrder.verify(inventoryService).reserveOneStock(10L);
         inOrder.verify(orderRepository).countByUserIdAndProductIdAndStatus(1L, 10L, OrderStatus.CONFIRMED);
         verify(cardPaymentHandler).cancel(any(), any(), any());
         verify(pointPaymentHandler).cancel(any(), any(), any());
@@ -247,7 +247,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.getOpenFromRepository(10L))
+        given(stayProductService.getOpenViewWithoutCache(10L))
                 .willReturn(stayProduct());
         given(paymentMethodHandlerFinder.get(PaymentMethod.CARD))
                 .willReturn(cardPaymentHandler);
@@ -260,7 +260,7 @@ class OrderServiceTest {
 
         assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.FAILED);
         assertThat(orderSheet.getFailureReason()).isEqualTo(OrderSheetFailureReason.PAYMENT_FAILED);
-        verify(inventoryService, never()).reserveOne(10L);
+        verify(inventoryService, never()).reserveOneStock(10L);
         verify(pointPaymentHandler, never()).approve(any());
         verify(paymentRepository, never()).save(any(Payment.class));
     }
@@ -280,7 +280,7 @@ class OrderServiceTest {
 
         verify(paymentPlanValidator, never()).validate(anyLong(), any());
         verify(cardPaymentHandler, never()).approve(any());
-        verify(inventoryService, never()).reserveOne(10L);
+        verify(inventoryService, never()).reserveOneStock(10L);
     }
 
     @Test
@@ -291,7 +291,7 @@ class OrderServiceTest {
         var orderSheet = orderSheet(OrderSheetStatus.CREATED);
         given(orderSheetRepository.getByTokenWithLock("sheet-token"))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.getOpenFromRepository(10L))
+        given(stayProductService.getOpenViewWithoutCache(10L))
                 .willThrow(new StayProductNotOpenException());
 
         // when & then
@@ -300,7 +300,7 @@ class OrderServiceTest {
 
         verify(paymentPlanValidator, never()).validate(anyLong(), any());
         verify(cardPaymentHandler, never()).approve(any());
-        verify(inventoryService, never()).reserveOne(10L);
+        verify(inventoryService, never()).reserveOneStock(10L);
     }
 
     @Test
@@ -313,7 +313,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.getOpenFromRepository(10L))
+        given(stayProductService.getOpenViewWithoutCache(10L))
                 .willReturn(stayProduct());
         given(paymentMethodHandlerFinder.get(PaymentMethod.CARD))
                 .willReturn(cardPaymentHandler);

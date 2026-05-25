@@ -40,7 +40,7 @@ class InventoryServiceConcurrencyTest {
     @Test
     @Timeout(10)
     @DisplayName("동시에 재고 예약을 요청해도 전체 수량보다 많이 성공하지 않는다")
-    void reserveOneDoesNotOversellWhenConcurrentRequestsArrive() throws Exception {
+    void reserveOneStockDoesNotOversellWhenConcurrentRequestsArrive() throws Exception {
         // given
         var productId = 1L;
         var requestCount = 1000;
@@ -65,7 +65,7 @@ class InventoryServiceConcurrencyTest {
                         readyLatch.countDown();
                         startLatch.await();
                         try {
-                            inventoryService.reserveOne(productId);
+                            inventoryService.reserveOneStock(productId);
                             return true;
                         } catch (SoldOutException e) {
                             return false;

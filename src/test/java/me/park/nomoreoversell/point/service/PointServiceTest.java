@@ -33,7 +33,7 @@ class PointServiceTest {
 
     @Test
     @DisplayName("포인트가 존재하면 잔액을 반환한다")
-    void availableReturnsBalanceWhenPointExists() {
+    void getAvailableBalanceReturnsBalanceWhenPointExists() {
         // given
         given(pointBalanceCache.get(1L))
                 .willReturn(Optional.empty());
@@ -41,7 +41,7 @@ class PointServiceTest {
                 .willReturn(Optional.of(point(10_000L)));
 
         // when
-        var result = pointService.available(1L);
+        var result = pointService.getAvailableBalance(1L);
 
         // then
         assertThat(result).isEqualTo(10_000L);
@@ -50,13 +50,13 @@ class PointServiceTest {
 
     @Test
     @DisplayName("포인트 캐시가 있으면 DB를 조회하지 않고 잔액을 반환한다")
-    void availableReturnsCachedBalanceWithoutRepositoryLookup() {
+    void getAvailableBalanceReturnsCachedBalanceWithoutRepositoryLookup() {
         // given
         given(pointBalanceCache.get(1L))
                 .willReturn(Optional.of(10_000L));
 
         // when
-        var result = pointService.available(1L);
+        var result = pointService.getAvailableBalance(1L);
 
         // then
         assertThat(result).isEqualTo(10_000L);
@@ -65,7 +65,7 @@ class PointServiceTest {
 
     @Test
     @DisplayName("포인트가 없으면 잔액을 0으로 반환한다")
-    void availableReturnsZeroWhenPointDoesNotExist() {
+    void getAvailableBalanceReturnsZeroWhenPointDoesNotExist() {
         // given
         given(pointBalanceCache.get(1L))
                 .willReturn(Optional.empty());
@@ -73,7 +73,7 @@ class PointServiceTest {
                 .willReturn(Optional.empty());
 
         // when
-        var result = pointService.available(1L);
+        var result = pointService.getAvailableBalance(1L);
 
         // then
         assertThat(result).isZero();
@@ -82,14 +82,14 @@ class PointServiceTest {
 
     @Test
     @DisplayName("잔액이 충분하면 포인트를 차감한다")
-    void deductDecreasesBalanceWhenBalanceIsEnough() {
+    void deductBalanceDecreasesBalanceWhenBalanceIsEnough() {
         // given
         var point = point(10_000L);
         given(pointRepository.getByUserIdWithLock(1L))
                 .willReturn(Optional.of(point));
 
         // when
-        pointService.deduct(1L, 3_000L);
+        pointService.deductBalance(1L, 3_000L);
 
         // then
         assertThat(point.getBalance()).isEqualTo(7_000L);
@@ -98,13 +98,13 @@ class PointServiceTest {
 
     @Test
     @DisplayName("포인트가 없으면 포인트를 차감할 수 없다")
-    void deductThrowsExceptionWhenPointDoesNotExist() {
+    void deductBalanceThrowsExceptionWhenPointDoesNotExist() {
         // given
         given(pointRepository.getByUserIdWithLock(1L))
                 .willReturn(Optional.empty());
 
         // when
-        var thrown = catchThrowable(() -> pointService.deduct(1L, 3_000L));
+        var thrown = catchThrowable(() -> pointService.deductBalance(1L, 3_000L));
 
         // then
         assertThat(thrown)
@@ -113,14 +113,14 @@ class PointServiceTest {
 
     @Test
     @DisplayName("잔액이 부족하면 포인트 차감에 실패한다")
-    void deductIfEnoughReturnsFalseWhenBalanceIsNotEnough() {
+    void deductIfBalanceEnoughReturnsFalseWhenBalanceIsNotEnough() {
         // given
         var point = point(1_000L);
         given(pointRepository.getByUserIdWithLock(1L))
                 .willReturn(Optional.of(point));
 
         // when
-        var result = pointService.deductIfEnough(1L, 3_000L);
+        var result = pointService.deductIfBalanceEnough(1L, 3_000L);
 
         // then
         assertThat(result).isFalse();
@@ -130,14 +130,14 @@ class PointServiceTest {
 
     @Test
     @DisplayName("포인트가 있으면 잔액을 복구한다")
-    void restoreIncreasesBalanceWhenPointExists() {
+    void restoreBalanceIncreasesBalanceWhenPointExists() {
         // given
         var point = point(7_000L);
         given(pointRepository.getByUserIdWithLock(1L))
                 .willReturn(Optional.of(point));
 
         // when
-        pointService.restore(1L, 3_000L);
+        pointService.restoreBalance(1L, 3_000L);
 
         // then
         assertThat(point.getBalance()).isEqualTo(10_000L);
@@ -146,13 +146,13 @@ class PointServiceTest {
 
     @Test
     @DisplayName("포인트가 없으면 복구할 수 없다")
-    void restoreThrowsExceptionWhenPointDoesNotExist() {
+    void restoreBalanceThrowsExceptionWhenPointDoesNotExist() {
         // given
         given(pointRepository.getByUserIdWithLock(1L))
                 .willReturn(Optional.empty());
 
         // when
-        var thrown = catchThrowable(() -> pointService.restore(1L, 3_000L));
+        var thrown = catchThrowable(() -> pointService.restoreBalance(1L, 3_000L));
 
         // then
         assertThat(thrown)

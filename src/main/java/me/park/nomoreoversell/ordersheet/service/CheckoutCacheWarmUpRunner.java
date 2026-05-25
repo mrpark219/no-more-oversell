@@ -24,14 +24,14 @@ public class CheckoutCacheWarmUpRunner implements ApplicationRunner {
         }
 
         for (Long productId : properties.getProductIds()) {
-            warmUp(productId);
+            warmUpCheckoutCaches(productId);
         }
     }
 
-    private void warmUp(Long productId) {
+    private void warmUpCheckoutCaches(Long productId) {
         try {
-            stayProductService.warmUp(productId);
-            inventoryService.warmUpSoldOutHint(productId);
+            stayProductService.warmUpCache(productId);
+            inventoryService.warmUpSoldOutHintCache(productId);
             log.info("체크아웃 캐시 웜업 완료. productId={}", productId);
         } catch (RuntimeException e) {
             log.warn("체크아웃 캐시 웜업 실패. productId={}", productId, e);

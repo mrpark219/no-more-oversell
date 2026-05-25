@@ -25,6 +25,6 @@ public class CheckoutController {
             @UserId Long userId,
             @RequestParam @Positive Long stayProductId
     ) {
-        return orderSheetService.checkout(new CheckoutRequest(userId, stayProductId));
+        return orderSheetService.prepareCheckout(new CheckoutRequest(userId, stayProductId));
     }
 }

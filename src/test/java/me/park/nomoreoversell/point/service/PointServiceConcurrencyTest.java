@@ -39,7 +39,7 @@ class PointServiceConcurrencyTest {
     @Test
     @Timeout(10)
     @DisplayName("동시에 포인트 차감을 요청해도 잔액보다 많이 성공하지 않는다")
-    void deductIfEnoughDoesNotOverDeductWhenConcurrentRequestsArrive() throws Exception {
+    void deductIfBalanceEnoughDoesNotOverDeductWhenConcurrentRequestsArrive() throws Exception {
         // given
         var userId = 1L;
         var requestCount = 1000;
@@ -63,7 +63,7 @@ class PointServiceConcurrencyTest {
                     .mapToObj(i -> executor.submit(() -> {
                         readyLatch.countDown();
                         startLatch.await();
-                        return pointService.deductIfEnough(userId, deductAmount);
+                        return pointService.deductIfBalanceEnough(userId, deductAmount);
                     }))
                     .toList();
 
