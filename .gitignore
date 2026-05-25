@@ -1,6 +1,7 @@
 HELP.md
 .gradle
 build/
+load-test/results/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

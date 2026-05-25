@@ -1,0 +1,58 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: no_more_oversell
+      MYSQL_USER: no_more_oversell
+      MYSQL_PASSWORD: no_more_oversell
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u no_more_oversell -pno_more_oversell --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:8.6.3-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+
+  app:
+    image: no-more-oversell-load-test-app:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/no_more_oversell?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: no_more_oversell
+      SPRING_DATASOURCE_PASSWORD: no_more_oversell
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    ports:
+      - "${LOAD_TEST_APP_PORT:-18080}:8080"
+
+  k6:
+    image: grafana/k6:latest
+    depends_on:
+      - app
+    volumes:
+      - ./k6:/scripts:ro
+      - ./results:/results
+    working_dir: /scripts
+
+volumes:
+  mysql-data:
