@@ -27,6 +27,14 @@ spring:
       - classpath:db/migration
       - classpath:db/seed
 
+checkout:
+  cache:
+    warm-up:
+      enabled: true
+      product-ids:
+        - 900001
+        - 900002
+
 resilience4j:
   circuitbreaker:
     configs:

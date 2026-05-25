@@ -25,7 +25,7 @@ public class ProductSoldOutCache {
     public boolean isSoldOut(Long productId) {
         var circuitBreaker = circuitBreakerFactory.create(CIRCUIT_BREAKER_NAME);
         return circuitBreaker.run(
-                () -> Boolean.TRUE.equals(redisTemplate.hasKey(key(productId))),
+                () -> redisTemplate.hasKey(key(productId)),
                 throwable -> {
                     log.debug("상품 마감 힌트 캐시 fallback. productId={}, cause={}", productId, causeOf(throwable));
                     return false;
