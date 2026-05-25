@@ -1,0 +1,44 @@
+@host = http://localhost:8080
+@userId = 1
+@stayProductId = 1
+@orderSheetToken = replace-with-checkout-response-token
+
+### Checkout
+GET {{host}}/api/checkout?stayProductId={{stayProductId}}
+userId: {{userId}}
+
+### Create order with card and point
+POST {{host}}/api/orders
+Content-Type: application/json
+userId: {{userId}}
+
+{
+  "orderSheetToken": "{{orderSheetToken}}",
+  "stayProductId": {{stayProductId}},
+  "paymentDetails": [
+    {
+      "paymentMethod": "CARD",
+      "amount": 9000
+    },
+    {
+      "paymentMethod": "POINT",
+      "amount": 1000
+    }
+  ]
+}
+
+### Create order with point only
+POST {{host}}/api/orders
+Content-Type: application/json
+userId: {{userId}}
+
+{
+  "orderSheetToken": "{{orderSheetToken}}",
+  "stayProductId": {{stayProductId}},
+  "paymentDetails": [
+    {
+      "paymentMethod": "POINT",
+      "amount": 10000
+    }
+  ]
+}
