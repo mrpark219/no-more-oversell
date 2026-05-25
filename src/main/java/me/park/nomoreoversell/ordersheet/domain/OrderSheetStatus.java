@@ -5,7 +5,6 @@ public enum OrderSheetStatus {
     READY,
     APPROVING,
     CONFIRMED,
-    SOLD_OUT,
-    PAYMENT_FAILED,
+    FAILED,
     EXPIRED
 }

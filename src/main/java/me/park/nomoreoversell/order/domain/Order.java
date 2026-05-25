@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import me.park.nomoreoversell.common.domain.BaseTimeEntity;
-import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
 
 import java.util.UUID;
 
@@ -70,14 +69,20 @@ public class Order extends BaseTimeEntity {
         this.status = status;
     }
 
-    public static Order confirmed(OrderSheet orderSheet) {
+    public static Order confirmed(
+            Long orderSheetId,
+            Long userId,
+            Long productId,
+            Long originalPrice,
+            Long salePrice
+    ) {
         return Order.builder()
                 .orderToken(UUID.randomUUID().toString())
-                .orderSheetId(orderSheet.getId())
-                .userId(orderSheet.getUserId())
-                .productId(orderSheet.getProductId())
-                .originalPrice(orderSheet.getOriginalPrice())
-                .salePrice(orderSheet.getSalePrice())
+                .orderSheetId(orderSheetId)
+                .userId(userId)
+                .productId(productId)
+                .originalPrice(originalPrice)
+                .salePrice(salePrice)
                 .status(OrderStatus.CONFIRMED)
                 .build();
     }

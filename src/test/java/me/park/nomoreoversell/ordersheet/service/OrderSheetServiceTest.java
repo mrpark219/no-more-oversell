@@ -1,10 +1,11 @@
 package me.park.nomoreoversell.ordersheet.service;
 
+import me.park.nomoreoversell.exception.StayProductNotOpenException;
 import me.park.nomoreoversell.inventory.service.InventoryService;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
 import me.park.nomoreoversell.ordersheet.repository.OrderSheetRepository;
 import me.park.nomoreoversell.point.service.PointService;
-import me.park.nomoreoversell.stayproduct.doamin.StayProductStatus;
+import me.park.nomoreoversell.stayproduct.domain.StayProductStatus;
 import me.park.nomoreoversell.stayproduct.service.StayProductService;
 import me.park.nomoreoversell.stayproduct.service.StayProductView;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import java.time.LocalTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -53,7 +55,7 @@ class OrderSheetServiceTest {
         var userId = 1L;
         var productId = 10L;
         given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.empty());
-        given(stayProductService.get(productId)).willReturn(stayProduct(productId));
+        given(stayProductService.getOpen(productId)).willReturn(stayProduct(productId));
         given(inventoryService.hasStock(productId)).willReturn(true);
         given(pointService.available(userId)).willReturn(5_000L);
         given(orderSheetRepository.save(any(OrderSheet.class)))
@@ -91,6 +93,21 @@ class OrderSheetServiceTest {
         // then
         assertThat(response).isEqualTo(cachedResponse);
         verifyNoInteractions(stayProductService, inventoryService, pointService, orderSheetRepository);
+    }
+
+    @Test
+    @DisplayName("오픈되지 않은 상품은 체크아웃 주문서를 생성하지 않는다")
+    void checkoutRejectsNotOpenProduct() {
+        // given
+        var userId = 1L;
+        var productId = 10L;
+        given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.empty());
+        given(stayProductService.getOpen(productId)).willThrow(new StayProductNotOpenException());
+
+        // when & then
+        assertThatThrownBy(() -> orderSheetService.checkout(new CheckoutRequest(userId, productId)))
+                .isInstanceOf(StayProductNotOpenException.class);
+        verifyNoInteractions(inventoryService, pointService, orderSheetRepository);
     }
 
     private StayProductView stayProduct(Long productId) {

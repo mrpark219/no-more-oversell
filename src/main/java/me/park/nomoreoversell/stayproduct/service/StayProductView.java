@@ -1,8 +1,8 @@
 package me.park.nomoreoversell.stayproduct.service;
 
 import lombok.Builder;
-import me.park.nomoreoversell.stayproduct.doamin.StayProduct;
-import me.park.nomoreoversell.stayproduct.doamin.StayProductStatus;
+import me.park.nomoreoversell.stayproduct.domain.StayProduct;
+import me.park.nomoreoversell.stayproduct.domain.StayProductStatus;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;

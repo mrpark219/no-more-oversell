@@ -8,11 +8,11 @@ import me.park.nomoreoversell.order.domain.Order;
 import me.park.nomoreoversell.order.domain.OrderStatus;
 import me.park.nomoreoversell.order.repository.OrderRepository;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
+import me.park.nomoreoversell.ordersheet.domain.OrderSheetFailureReason;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheetStatus;
 import me.park.nomoreoversell.ordersheet.repository.OrderSheetRepository;
 import me.park.nomoreoversell.payment.domain.Payment;
 import me.park.nomoreoversell.payment.domain.PaymentDetail;
-import me.park.nomoreoversell.payment.domain.PaymentMethod;
 import me.park.nomoreoversell.payment.method.PaymentApprovalRequest;
 import me.park.nomoreoversell.payment.method.PaymentApprovalResult;
 import me.park.nomoreoversell.payment.method.PaymentMethodHandlerFinder;
@@ -43,17 +43,18 @@ public class OrderService {
     private final PaymentMethodHandlerFinder paymentMethodHandlerFinder;
 
     public CreateOrderResponse createOrder(CreateOrderRequest request) {
-        var orderSheet = prepareOrderSheetForApproval(request);
+        var preparation = prepareOrderSheetForApproval(request);
+        var orderSheet = preparation.orderSheet();
         if (orderSheet.isConfirmed()) {
             return findConfirmedOrder(orderSheet);
         }
 
-        var stayProduct = stayProductService.get(request.stayProductId());
+        var stayProduct = preparation.stayProduct();
         Payment payment;
         try {
             payment = approvePayment(request, orderSheet);
         } catch (RuntimeException e) {
-            markOrderSheetPaymentFailed(orderSheet.getId());
+            markOrderSheetFailed(orderSheet.getId(), OrderSheetFailureReason.PAYMENT_FAILED);
             throw e;
         }
 
@@ -61,27 +62,31 @@ public class OrderService {
             return confirmApprovedOrder(orderSheet.getId(), stayProduct, payment);
         } catch (RuntimeException e) {
             cancelApprovedPayment(request.userId(), payment, "ORDER_CONFIRM_FAILED");
-            recordFailedConfirmation(orderSheet.getId(), payment);
+            recordFailedConfirmation(orderSheet.getId(), payment, failureReason(e));
             throw e;
         }
     }
 
-    private OrderSheet prepareOrderSheetForApproval(CreateOrderRequest request) {
+    private OrderPreparation prepareOrderSheetForApproval(CreateOrderRequest request) {
         return transactionTemplate.execute(status -> {
             var orderSheet = orderSheetRepository.getByTokenWithLock(request.orderSheetToken())
                     .orElseThrow(OrderSheetNotFoundException::new);
 
             validateRequestMatchesOrderSheet(request, orderSheet);
             if (orderSheet.isConfirmed()) {
-                return orderSheet;
+                return OrderPreparation.confirmed(orderSheet);
+            }
+            if (orderSheet.isApproving()) {
+                throw new OrderInProgressException();
             }
             if (orderSheet.getStatus() != OrderSheetStatus.CREATED) {
                 throw new InvalidOrderSheetStateException();
             }
 
-            paymentPlanValidator.validate(orderSheet.getSalePrice(), request.paymentDetails());
+            var stayProduct = stayProductService.getOpen(request.stayProductId());
+            paymentPlanValidator.validate(orderSheet.getSalePrice(), paymentDetailRequests(request.paymentDetails()));
             orderSheet.markApproving();
-            return orderSheet;
+            return OrderPreparation.newOrder(orderSheet, stayProduct);
         });
     }
 
@@ -100,7 +105,13 @@ public class OrderService {
             validatePurchaseLimit(orderSheet, stayProduct);
             paymentRepository.save(payment);
 
-            var order = orderRepository.save(Order.confirmed(orderSheet));
+            var order = orderRepository.save(Order.confirmed(
+                    orderSheet.getId(),
+                    orderSheet.getUserId(),
+                    orderSheet.getProductId(),
+                    orderSheet.getOriginalPrice(),
+                    orderSheet.getSalePrice()
+            ));
             orderSheet.markConfirmed();
 
             log.info(
@@ -114,23 +125,33 @@ public class OrderService {
         });
     }
 
-    private void markOrderSheetPaymentFailed(Long orderSheetId) {
+    private void markOrderSheetFailed(Long orderSheetId, OrderSheetFailureReason failureReason) {
         transactionTemplate.execute(status -> {
             var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
                     .orElseThrow(OrderSheetNotFoundException::new);
-            orderSheet.markPaymentFailed();
+            orderSheet.markFailed(failureReason);
             return null;
         });
     }
 
-    private void recordFailedConfirmation(Long orderSheetId, Payment payment) {
+    private void recordFailedConfirmation(Long orderSheetId, Payment payment, OrderSheetFailureReason failureReason) {
         transactionTemplate.execute(status -> {
             var orderSheet = orderSheetRepository.getByIdWithLock(orderSheetId)
                     .orElseThrow(OrderSheetNotFoundException::new);
-            orderSheet.markPaymentFailed();
+            orderSheet.markFailed(failureReason);
             paymentRepository.save(payment);
             return null;
         });
+    }
+
+    private OrderSheetFailureReason failureReason(RuntimeException exception) {
+        if (exception instanceof SoldOutException) {
+            return OrderSheetFailureReason.SOLD_OUT;
+        }
+        if (exception instanceof PurchaseLimitExceededException) {
+            return OrderSheetFailureReason.PURCHASE_LIMIT_EXCEEDED;
+        }
+        return OrderSheetFailureReason.ORDER_CONFIRM_FAILED;
     }
 
     private CreateOrderResponse findConfirmedOrder(OrderSheet orderSheet) {
@@ -211,7 +232,7 @@ public class OrderService {
     private void cancelApprovedPayment(Long userId, Payment payment, String reason) {
         var approvedPayments = payment.orderedDetails().stream()
                 .map(detail -> new ApprovedPayment(
-                        new PaymentDetailRequest(detail.getPaymentMethod(), detail.getPaymentAmount()),
+                        new CreateOrderPaymentRequest(detail.getPaymentMethod(), detail.getPaymentAmount()),
                         new PaymentApprovalRequest(userId, detail.getPaymentMethod(), detail.getPaymentAmount()),
                         PaymentApprovalResult.success(detail.getExternalTransactionKey()),
                         detail
@@ -243,11 +264,28 @@ public class OrderService {
         payment.markCanceled();
     }
 
+    private List<PaymentDetailRequest> paymentDetailRequests(List<CreateOrderPaymentRequest> paymentDetails) {
+        return paymentDetails.stream()
+                .map(detail -> new PaymentDetailRequest(detail.paymentMethod(), detail.amount()))
+                .toList();
+    }
+
     private record ApprovedPayment(
-            PaymentDetailRequest paymentDetailRequest,
+            CreateOrderPaymentRequest paymentDetailRequest,
             PaymentApprovalRequest approvalRequest,
             PaymentApprovalResult approvalResult,
             PaymentDetail paymentDetail
     ) {
+    }
+
+    private record OrderPreparation(OrderSheet orderSheet, StayProductView stayProduct) {
+
+        private static OrderPreparation confirmed(OrderSheet orderSheet) {
+            return new OrderPreparation(orderSheet, null);
+        }
+
+        private static OrderPreparation newOrder(OrderSheet orderSheet, StayProductView stayProduct) {
+            return new OrderPreparation(orderSheet, stayProduct);
+        }
     }
 }

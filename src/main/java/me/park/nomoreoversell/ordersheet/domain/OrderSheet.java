@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import me.park.nomoreoversell.common.domain.BaseTimeEntity;
-import me.park.nomoreoversell.stayproduct.doamin.StayProduct;
 
 @Entity
 @Table(
@@ -42,6 +41,10 @@ public class OrderSheet extends BaseTimeEntity {
     @Column(nullable = false)
     private OrderSheetStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column
+    private OrderSheetFailureReason failureReason;
+
     @Builder
     private OrderSheet(
             String orderSheetToken,
@@ -49,7 +52,8 @@ public class OrderSheet extends BaseTimeEntity {
             Long productId,
             Long originalPrice,
             Long salePrice,
-            OrderSheetStatus status
+            OrderSheetStatus status,
+            OrderSheetFailureReason failureReason
     ) {
         this.orderSheetToken = orderSheetToken;
         this.userId = userId;
@@ -57,37 +61,44 @@ public class OrderSheet extends BaseTimeEntity {
         this.originalPrice = originalPrice;
         this.salePrice = salePrice;
         this.status = status;
+        this.failureReason = failureReason;
     }
 
-    public static OrderSheet create(String orderSheetToken, Long userId, StayProduct product) {
+    public static OrderSheet create(
+            String orderSheetToken,
+            Long userId,
+            Long productId,
+            Long originalPrice,
+            Long salePrice
+    ) {
         return OrderSheet.builder()
                 .orderSheetToken(orderSheetToken)
                 .userId(userId)
-                .productId(product.getId())
-                .originalPrice(product.getOriginalPrice())
-                .salePrice(product.getSalePrice())
+                .productId(productId)
+                .originalPrice(originalPrice)
+                .salePrice(salePrice)
                 .status(OrderSheetStatus.CREATED)
                 .build();
     }
 
     public void markReady() {
         this.status = OrderSheetStatus.READY;
+        this.failureReason = null;
     }
 
     public void markApproving() {
         this.status = OrderSheetStatus.APPROVING;
+        this.failureReason = null;
     }
 
     public void markConfirmed() {
         this.status = OrderSheetStatus.CONFIRMED;
+        this.failureReason = null;
     }
 
-    public void markSoldOut() {
-        this.status = OrderSheetStatus.SOLD_OUT;
-    }
-
-    public void markPaymentFailed() {
-        this.status = OrderSheetStatus.PAYMENT_FAILED;
+    public void markFailed(OrderSheetFailureReason failureReason) {
+        this.status = OrderSheetStatus.FAILED;
+        this.failureReason = failureReason;
     }
 
     public boolean isReady() {

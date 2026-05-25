@@ -5,6 +5,7 @@ import me.park.nomoreoversell.common.web.UserIdArgumentResolver;
 import me.park.nomoreoversell.common.web.WebMvcConfig;
 import me.park.nomoreoversell.exception.SoldOutException;
 import me.park.nomoreoversell.order.controller.OrderController;
+import me.park.nomoreoversell.order.service.CreateOrderPaymentRequest;
 import me.park.nomoreoversell.order.domain.OrderStatus;
 import me.park.nomoreoversell.order.service.CreateOrderRequest;
 import me.park.nomoreoversell.order.service.CreateOrderResponse;
@@ -16,7 +17,6 @@ import me.park.nomoreoversell.ordersheet.service.OrderSheetService;
 import me.park.nomoreoversell.payment.domain.PaymentDetailStatus;
 import me.park.nomoreoversell.payment.domain.PaymentMethod;
 import me.park.nomoreoversell.payment.domain.PaymentStatus;
-import me.park.nomoreoversell.payment.service.PaymentDetailRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,8 +101,8 @@ class OrderApiTest {
                 "sheet-token",
                 10L,
                 List.of(
-                        new PaymentDetailRequest(PaymentMethod.CARD, 9_000L),
-                        new PaymentDetailRequest(PaymentMethod.POINT, 1_000L)
+                        new CreateOrderPaymentRequest(PaymentMethod.CARD, 9_000L),
+                        new CreateOrderPaymentRequest(PaymentMethod.POINT, 1_000L)
                 )
         );
         given(orderService.createOrder(request))

@@ -4,11 +4,14 @@ import me.park.nomoreoversell.inventory.service.InventoryService;
 import me.park.nomoreoversell.order.domain.Order;
 import me.park.nomoreoversell.order.domain.OrderStatus;
 import me.park.nomoreoversell.order.repository.OrderRepository;
+import me.park.nomoreoversell.ordersheet.domain.OrderSheetFailureReason;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheetStatus;
 import me.park.nomoreoversell.ordersheet.repository.OrderSheetRepository;
+import me.park.nomoreoversell.exception.OrderInProgressException;
 import me.park.nomoreoversell.exception.PaymentFailedException;
 import me.park.nomoreoversell.exception.PurchaseLimitExceededException;
+import me.park.nomoreoversell.exception.StayProductNotOpenException;
 import me.park.nomoreoversell.payment.domain.Payment;
 import me.park.nomoreoversell.payment.domain.PaymentDetailStatus;
 import me.park.nomoreoversell.payment.domain.PaymentMethod;
@@ -20,7 +23,7 @@ import me.park.nomoreoversell.payment.method.PaymentMethodHandlerFinder;
 import me.park.nomoreoversell.payment.repository.PaymentRepository;
 import me.park.nomoreoversell.payment.service.PaymentDetailRequest;
 import me.park.nomoreoversell.payment.service.PaymentPlanValidator;
-import me.park.nomoreoversell.stayproduct.doamin.StayProductStatus;
+import me.park.nomoreoversell.stayproduct.domain.StayProductStatus;
 import me.park.nomoreoversell.stayproduct.service.StayProductService;
 import me.park.nomoreoversell.stayproduct.service.StayProductView;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +45,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -108,7 +112,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.get(10L))
+        given(stayProductService.getOpen(10L))
                 .willReturn(stayProduct());
         given(orderRepository.countByUserIdAndProductIdAndStatus(1L, 10L, OrderStatus.CONFIRMED))
                 .willReturn(0L);
@@ -146,7 +150,7 @@ class OrderServiceTest {
         assertThat(response.payment().details()).hasSize(2);
         assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.CONFIRMED);
 
-        verify(paymentPlanValidator).validate(10_000L, request.paymentDetails());
+        verify(paymentPlanValidator).validate(10_000L, paymentDetailRequests());
         verify(cardPaymentHandler).approve(any());
         verify(pointPaymentHandler).approve(any());
         var inOrder = inOrder(cardPaymentHandler, pointPaymentHandler, inventoryService, orderRepository);
@@ -200,7 +204,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.get(10L))
+        given(stayProductService.getOpen(10L))
                 .willReturn(stayProduct());
         given(paymentMethodHandlerFinder.get(PaymentMethod.CARD))
                 .willReturn(cardPaymentHandler);
@@ -227,6 +231,8 @@ class OrderServiceTest {
         verify(cardPaymentHandler).cancel(any(), any(), any());
         verify(pointPaymentHandler).cancel(any(), any(), any());
         verify(paymentRepository).save(any(Payment.class));
+        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.FAILED);
+        assertThat(orderSheet.getFailureReason()).isEqualTo(OrderSheetFailureReason.PURCHASE_LIMIT_EXCEEDED);
     }
 
     @Test
@@ -239,7 +245,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.get(10L))
+        given(stayProductService.getOpen(10L))
                 .willReturn(stayProduct());
         given(paymentMethodHandlerFinder.get(PaymentMethod.CARD))
                 .willReturn(cardPaymentHandler);
@@ -250,10 +256,49 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrder(request))
                 .isInstanceOf(PaymentFailedException.class);
 
-        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.PAYMENT_FAILED);
+        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.FAILED);
+        assertThat(orderSheet.getFailureReason()).isEqualTo(OrderSheetFailureReason.PAYMENT_FAILED);
         verify(inventoryService, never()).reserveOne(10L);
         verify(pointPaymentHandler, never()).approve(any());
         verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("주문서가 이미 처리 중이면 처리 중 주문 예외를 던진다")
+    void createOrderThrowsOrderInProgressWhenOrderSheetIsApproving() {
+        // given
+        var request = bookingRequest();
+        var orderSheet = orderSheet(OrderSheetStatus.APPROVING);
+        given(orderSheetRepository.getByTokenWithLock("sheet-token"))
+                .willReturn(Optional.of(orderSheet));
+
+        // when & then
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(OrderInProgressException.class);
+
+        verify(paymentPlanValidator, never()).validate(anyLong(), any());
+        verify(cardPaymentHandler, never()).approve(any());
+        verify(inventoryService, never()).reserveOne(10L);
+    }
+
+    @Test
+    @DisplayName("주문 생성 시 상품이 오픈되지 않았으면 결제를 승인하지 않는다")
+    void createOrderRejectsNotOpenProductBeforePaymentApproval() {
+        // given
+        var request = bookingRequest();
+        var orderSheet = orderSheet(OrderSheetStatus.CREATED);
+        given(orderSheetRepository.getByTokenWithLock("sheet-token"))
+                .willReturn(Optional.of(orderSheet));
+        given(stayProductService.getOpen(10L))
+                .willThrow(new StayProductNotOpenException());
+
+        // when & then
+        assertThatThrownBy(() -> orderService.createOrder(request))
+                .isInstanceOf(StayProductNotOpenException.class);
+
+        verify(paymentPlanValidator, never()).validate(anyLong(), any());
+        verify(cardPaymentHandler, never()).approve(any());
+        verify(inventoryService, never()).reserveOne(10L);
     }
 
     @Test
@@ -266,7 +311,7 @@ class OrderServiceTest {
                 .willReturn(Optional.of(orderSheet));
         given(orderSheetRepository.getByIdWithLock(1L))
                 .willReturn(Optional.of(orderSheet));
-        given(stayProductService.get(10L))
+        given(stayProductService.getOpen(10L))
                 .willReturn(stayProduct());
         given(paymentMethodHandlerFinder.get(PaymentMethod.CARD))
                 .willReturn(cardPaymentHandler);
@@ -292,6 +337,8 @@ class OrderServiceTest {
         assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.CANCEL_FAILED);
         assertThat(paymentCaptor.getValue().getDetails())
                 .anyMatch(detail -> detail.getStatus() == PaymentDetailStatus.CANCEL_FAILED);
+        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.FAILED);
+        assertThat(orderSheet.getFailureReason()).isEqualTo(OrderSheetFailureReason.PURCHASE_LIMIT_EXCEEDED);
     }
 
     private CreateOrderRequest bookingRequest() {
@@ -300,9 +347,16 @@ class OrderServiceTest {
                 "sheet-token",
                 10L,
                 List.of(
-                        new PaymentDetailRequest(PaymentMethod.CARD, 9_000L),
-                        new PaymentDetailRequest(PaymentMethod.POINT, 1_000L)
+                        new CreateOrderPaymentRequest(PaymentMethod.CARD, 9_000L),
+                        new CreateOrderPaymentRequest(PaymentMethod.POINT, 1_000L)
                 )
+        );
+    }
+
+    private List<PaymentDetailRequest> paymentDetailRequests() {
+        return List.of(
+                new PaymentDetailRequest(PaymentMethod.CARD, 9_000L),
+                new PaymentDetailRequest(PaymentMethod.POINT, 1_000L)
         );
     }
 
@@ -320,7 +374,13 @@ class OrderServiceTest {
     }
 
     private Order confirmedOrder(OrderSheet orderSheet) {
-        return Order.confirmed(orderSheet);
+        return Order.confirmed(
+                orderSheet.getId(),
+                orderSheet.getUserId(),
+                orderSheet.getProductId(),
+                orderSheet.getOriginalPrice(),
+                orderSheet.getSalePrice()
+        );
     }
 
     private Payment approvedPayment(OrderSheet orderSheet) {

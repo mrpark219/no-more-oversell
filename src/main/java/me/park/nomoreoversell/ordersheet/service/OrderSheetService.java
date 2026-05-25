@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me.park.nomoreoversell.inventory.service.InventoryService;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
-import me.park.nomoreoversell.ordersheet.domain.OrderSheetStatus;
 import me.park.nomoreoversell.ordersheet.repository.OrderSheetRepository;
 import me.park.nomoreoversell.point.service.PointService;
 import me.park.nomoreoversell.stayproduct.service.StayProductService;
@@ -32,7 +31,7 @@ public class OrderSheetService {
     }
 
     private CheckoutResponse createCheckoutResponse(CheckoutRequest request) {
-        var stayProduct = stayProductService.get(request.stayProductId());
+        var stayProduct = stayProductService.getOpen(request.stayProductId());
         var hasStock = inventoryService.hasStock(request.stayProductId());
         var availablePoint = pointService.available(request.userId());
         var orderSheet = createOrderSheet(request, stayProduct);
@@ -47,14 +46,13 @@ public class OrderSheetService {
     }
 
     private OrderSheet createOrderSheet(CheckoutRequest request, StayProductView stayProduct) {
-        var orderSheet = orderSheetRepository.save(OrderSheet.builder()
-                .orderSheetToken(UUID.randomUUID().toString())
-                .userId(request.userId())
-                .productId(stayProduct.id())
-                .originalPrice(stayProduct.originalPrice())
-                .salePrice(stayProduct.salePrice())
-                .status(OrderSheetStatus.CREATED)
-                .build());
+        var orderSheet = orderSheetRepository.save(OrderSheet.create(
+                UUID.randomUUID().toString(),
+                request.userId(),
+                stayProduct.id(),
+                stayProduct.originalPrice(),
+                stayProduct.salePrice()
+        ));
 
         log.info(
                 "주문서 생성 완료. userId={}, stayProductId={}, orderSheetToken={}",

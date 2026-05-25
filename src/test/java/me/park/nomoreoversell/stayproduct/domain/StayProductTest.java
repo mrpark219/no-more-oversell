@@ -1,4 +1,4 @@
-package me.park.nomoreoversell.stayproduct.doamin;
+package me.park.nomoreoversell.stayproduct.domain;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

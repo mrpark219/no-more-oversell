@@ -1,13 +1,7 @@
 package me.park.nomoreoversell.ordersheet.domain;
 
-import me.park.nomoreoversell.stayproduct.doamin.StayProduct;
-import me.park.nomoreoversell.stayproduct.doamin.StayProductStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,11 +11,9 @@ class OrderSheetTest {
     @DisplayName("숙소 상품 금액을 복사해 주문서를 생성한다")
     void createCopiesProductPriceSnapshot() {
         // given
-        var product = stayProduct();
-        ReflectionTestUtils.setField(product, "id", 10L);
 
         // when
-        var orderSheet = OrderSheet.create("sheet-token", 1L, product);
+        var orderSheet = OrderSheet.create("sheet-token", 1L, 10L, 20_000L, 10_000L);
 
         // then
         assertThat(orderSheet.getOrderSheetToken()).isEqualTo("sheet-token");
@@ -111,29 +103,32 @@ class OrderSheetTest {
     }
 
     @Test
-    @DisplayName("주문서를 품절 상태로 변경한다")
-    void markSoldOutChangesStatusToSoldOut() {
+    @DisplayName("주문서를 실패 상태로 변경하고 실패 사유를 저장한다")
+    void markFailedChangesStatusToFailedAndStoresFailureReason() {
         // given
         var orderSheet = orderSheet();
 
         // when
-        orderSheet.markSoldOut();
+        orderSheet.markFailed(OrderSheetFailureReason.SOLD_OUT);
 
         // then
-        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.SOLD_OUT);
+        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.FAILED);
+        assertThat(orderSheet.getFailureReason()).isEqualTo(OrderSheetFailureReason.SOLD_OUT);
     }
 
     @Test
-    @DisplayName("주문서를 결제 실패 상태로 변경한다")
-    void markPaymentFailedChangesStatusToPaymentFailed() {
+    @DisplayName("주문서를 확정 상태로 변경하면 실패 사유를 비운다")
+    void markConfirmedClearsFailureReason() {
         // given
         var orderSheet = orderSheet();
+        orderSheet.markFailed(OrderSheetFailureReason.PAYMENT_FAILED);
 
         // when
-        orderSheet.markPaymentFailed();
+        orderSheet.markConfirmed();
 
         // then
-        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.PAYMENT_FAILED);
+        assertThat(orderSheet.getStatus()).isEqualTo(OrderSheetStatus.CONFIRMED);
+        assertThat(orderSheet.getFailureReason()).isNull();
     }
 
     private OrderSheet orderSheet() {
@@ -144,21 +139,6 @@ class OrderSheetTest {
                 .originalPrice(20_000L)
                 .salePrice(10_000L)
                 .status(OrderSheetStatus.CREATED)
-                .build();
-    }
-
-    private StayProduct stayProduct() {
-        return StayProduct.builder()
-                .accommodationName("테스트 호텔")
-                .roomName("디럭스")
-                .ratePlanName("특가")
-                .originalPrice(20_000L)
-                .salePrice(10_000L)
-                .openAt(LocalDateTime.now().minusDays(1))
-                .status(StayProductStatus.OPEN)
-                .checkinTime(LocalTime.of(15, 0))
-                .checkoutTime(LocalTime.of(11, 0))
-                .maxPerUser(1L)
                 .build();
     }
 }

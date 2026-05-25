@@ -1,4 +1,4 @@
-package me.park.nomoreoversell.stayproduct.doamin;
+package me.park.nomoreoversell.stayproduct.domain;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;

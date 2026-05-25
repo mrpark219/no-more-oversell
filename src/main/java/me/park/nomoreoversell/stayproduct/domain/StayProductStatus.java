@@ -1,4 +1,4 @@
-package me.park.nomoreoversell.stayproduct.doamin;
+package me.park.nomoreoversell.stayproduct.domain;
 
 public enum StayProductStatus {
     OPEN,
