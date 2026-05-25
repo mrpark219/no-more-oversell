@@ -1,13 +1,21 @@
 @host = http://localhost:8080
-@userId = 1
-@stayProductId = 1
-@orderSheetToken = replace-with-checkout-response-token
+@userId = 900001
+@stayProductId = 900001
+@soldOutStayProductId = 900002
 
-### Checkout
+### 1. 체크아웃 - 숙박 상품 주문서 토큰 발급
+# 숙박 상품 ID로 체크아웃을 요청하여 주문서 토큰을 발급받는다.
+# 응답으로 받은 orderSheetToken은 이후 주문 생성 시 사용한다.
 GET {{host}}/api/checkout?stayProductId={{stayProductId}}
 userId: {{userId}}
 
-### Create order with card and point
+> {%
+    client.global.set("orderSheetToken", response.body.orderSheetToken);
+%}
+
+### 2. 주문 생성 - 카드 + 포인트 복합 결제
+# 1번에서 발급받은 주문서 토큰을 사용하여 주문을 생성한다.
+# 카드 9,000원 + 포인트 1,000원으로 총 10,000원을 복합 결제한다.
 POST {{host}}/api/orders
 Content-Type: application/json
 userId: {{userId}}
@@ -27,7 +35,37 @@ userId: {{userId}}
   ]
 }
 
-### Create order with point only
+### 3. 주문 중복 생성 시도 - 이미 사용된 주문서 토큰으로 재요청
+# 2번과 동일한 주문서 토큰으로 재요청하여 멱등성을 검증한다.
+# 이미 완료된 주문서 토큰이므로 중복 주문이 방지되어야 한다.
+POST {{host}}/api/orders
+Content-Type: application/json
+userId: {{userId}}
+
+{
+  "orderSheetToken": "{{orderSheetToken}}",
+  "stayProductId": {{stayProductId}},
+  "paymentDetails": [
+    {
+      "paymentMethod": "CARD",
+      "amount": 9000
+    },
+    {
+      "paymentMethod": "POINT",
+      "amount": 1000
+    }
+  ]
+}
+
+### 4. 체크아웃 - 품절 상품 주문서 토큰 발급 시도
+# 재고가 없는 품절 상품으로 체크아웃을 요청한다.
+# 품절 상태이므로 주문서 토큰 발급이 거부되어야 한다.
+GET {{host}}/api/checkout?stayProductId={{soldOutStayProductId}}
+userId: {{userId}}
+
+### 5. 주문 생성 - 포인트 단독 결제
+# 1번에서 발급받은 주문서 토큰을 사용하여 포인트만으로 결제한다.
+# 포인트 10,000원으로 전액 결제하는 경우를 검증한다.
 POST {{host}}/api/orders
 Content-Type: application/json
 userId: {{userId}}
