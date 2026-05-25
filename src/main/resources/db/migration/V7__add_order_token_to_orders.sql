@@ -1,0 +1,3 @@
+ALTER TABLE orders
+    ADD COLUMN order_token VARCHAR(100) NOT NULL AFTER id,
+    ADD UNIQUE KEY UNI_ORDERS_ORDER_TOKEN (order_token);

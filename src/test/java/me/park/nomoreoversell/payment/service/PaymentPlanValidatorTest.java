@@ -29,7 +29,15 @@ class PaymentPlanValidatorTest {
                 new PaymentDetailRequest(PaymentMethod.CARD, 5_000L),
                 new PaymentDetailRequest(PaymentMethod.Y_PAY, 5_000L)
         ))).isInstanceOf(InvalidPaymentCombinationException.class)
-                .hasMessage("주결제수단은 1개까지만 사용할 수 있습니다.");
+                .hasMessage("PG 결제가 필요한 결제수단은 1개까지만 사용할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("포인트만으로도 결제할 수 있다")
+    void validateSucceedsWhenOnlyPointIsUsed() {
+        paymentPlanValidator.validate(10_000L, List.of(
+                new PaymentDetailRequest(PaymentMethod.POINT, 10_000L)
+        ));
     }
 
     @Test

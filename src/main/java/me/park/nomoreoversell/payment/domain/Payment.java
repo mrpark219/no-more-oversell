@@ -127,6 +127,10 @@ public class Payment extends BaseTimeEntity {
         this.status = PaymentStatus.CANCELED;
     }
 
+    public void markCancelFailed() {
+        this.status = PaymentStatus.CANCEL_FAILED;
+    }
+
     public void cancelDetail(PaymentMethod paymentMethod, long cancelAmount, String cancelKey, String reason) {
         findDetail(paymentMethod)
                 .orElseThrow(() -> new IllegalArgumentException("취소할 결제 상세를 찾을 수 없습니다."))

@@ -155,6 +155,11 @@ public class PaymentDetail extends BaseTimeEntity {
         this.failureReason = reason;
     }
 
+    public void markCancelFailed(String reason) {
+        this.status = PaymentDetailStatus.CANCEL_FAILED;
+        this.failureReason = reason;
+    }
+
     public boolean isReady() {
         return status == PaymentDetailStatus.READY;
     }

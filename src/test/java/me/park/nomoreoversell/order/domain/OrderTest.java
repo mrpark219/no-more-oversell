@@ -26,6 +26,7 @@ class OrderTest {
         var order = Order.confirmed(orderSheet);
 
         assertThat(order.getOrderSheetId()).isEqualTo(100L);
+        assertThat(order.getOrderToken()).isNotBlank();
         assertThat(order.getUserId()).isEqualTo(1L);
         assertThat(order.getProductId()).isEqualTo(10L);
         assertThat(order.getOriginalPrice()).isEqualTo(20_000L);

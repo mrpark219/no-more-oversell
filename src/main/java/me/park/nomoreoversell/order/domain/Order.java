@@ -8,11 +8,14 @@ import lombok.NoArgsConstructor;
 import me.park.nomoreoversell.common.domain.BaseTimeEntity;
 import me.park.nomoreoversell.ordersheet.domain.OrderSheet;
 
+import java.util.UUID;
+
 @Entity
 @Table(
         name = "orders",
         uniqueConstraints = {
-                @UniqueConstraint(name = "UNI_ORDERS_ORDER_SHEET_ID", columnNames = "order_sheet_id")
+                @UniqueConstraint(name = "UNI_ORDERS_ORDER_SHEET_ID", columnNames = "order_sheet_id"),
+                @UniqueConstraint(name = "UNI_ORDERS_ORDER_TOKEN", columnNames = "order_token")
         },
         indexes = {
                 @Index(name = "IDX_ORDERS_USER_PRODUCT_STATUS", columnList = "user_id, product_id, status")
@@ -25,6 +28,9 @@ public class Order extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false)
+    private String orderToken;
 
     @Column(nullable = false)
     private Long orderSheetId;
@@ -47,6 +53,7 @@ public class Order extends BaseTimeEntity {
 
     @Builder
     private Order(
+            String orderToken,
             Long orderSheetId,
             Long userId,
             Long productId,
@@ -54,6 +61,7 @@ public class Order extends BaseTimeEntity {
             Long salePrice,
             OrderStatus status
     ) {
+        this.orderToken = orderToken;
         this.orderSheetId = orderSheetId;
         this.userId = userId;
         this.productId = productId;
@@ -64,6 +72,7 @@ public class Order extends BaseTimeEntity {
 
     public static Order confirmed(OrderSheet orderSheet) {
         return Order.builder()
+                .orderToken(UUID.randomUUID().toString())
                 .orderSheetId(orderSheet.getId())
                 .userId(orderSheet.getUserId())
                 .productId(orderSheet.getProductId())

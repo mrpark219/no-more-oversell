@@ -18,7 +18,7 @@ public final class PaymentCompositionPolicy {
                 .filter(detail -> detail.paymentMethod().isPgNeeded())
                 .count();
         if (pgCount > 1) {
-            throw new InvalidPaymentCombinationException("주결제수단은 1개까지만 사용할 수 있습니다.");
+            throw new InvalidPaymentCombinationException("PG 결제가 필요한 결제수단은 1개까지만 사용할 수 있습니다.");
         }
 
         var distinctCount = paymentDetailRequests.stream()

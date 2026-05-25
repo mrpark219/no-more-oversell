@@ -24,6 +24,16 @@ public class OrderSheetRepositoryCustomImpl implements OrderSheetRepositoryCusto
     }
 
     @Override
+    public Optional<OrderSheet> getByTokenWithLock(String orderSheetToken) {
+        return Optional.ofNullable(
+                factory.selectFrom(orderSheet)
+                        .where(orderSheet.orderSheetToken.eq(orderSheetToken))
+                        .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                        .fetchOne()
+        );
+    }
+
+    @Override
     public Optional<OrderSheet> getByIdWithLock(Long id) {
         return Optional.ofNullable(
                 factory.selectFrom(orderSheet)

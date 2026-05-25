@@ -8,5 +8,7 @@ public interface OrderSheetRepositoryCustom {
 
     Optional<OrderSheet> findByToken(String orderSheetToken);
 
+    Optional<OrderSheet> getByTokenWithLock(String orderSheetToken);
+
     Optional<OrderSheet> getByIdWithLock(Long id);
 }
