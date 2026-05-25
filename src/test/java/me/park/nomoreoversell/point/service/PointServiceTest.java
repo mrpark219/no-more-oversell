@@ -16,12 +16,17 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class PointServiceTest {
 
     @Mock
     private PointRepository pointRepository;
+
+    @Mock
+    private PointBalanceCache pointBalanceCache;
 
     @InjectMocks
     private PointService pointService;
@@ -30,6 +35,8 @@ class PointServiceTest {
     @DisplayName("포인트가 존재하면 잔액을 반환한다")
     void availableReturnsBalanceWhenPointExists() {
         // given
+        given(pointBalanceCache.get(1L))
+                .willReturn(Optional.empty());
         given(pointRepository.findByUserId(1L))
                 .willReturn(Optional.of(point(10_000L)));
 
@@ -38,12 +45,30 @@ class PointServiceTest {
 
         // then
         assertThat(result).isEqualTo(10_000L);
+        verify(pointBalanceCache).put(1L, 10_000L);
+    }
+
+    @Test
+    @DisplayName("포인트 캐시가 있으면 DB를 조회하지 않고 잔액을 반환한다")
+    void availableReturnsCachedBalanceWithoutRepositoryLookup() {
+        // given
+        given(pointBalanceCache.get(1L))
+                .willReturn(Optional.of(10_000L));
+
+        // when
+        var result = pointService.available(1L);
+
+        // then
+        assertThat(result).isEqualTo(10_000L);
+        verifyNoInteractions(pointRepository);
     }
 
     @Test
     @DisplayName("포인트가 없으면 잔액을 0으로 반환한다")
     void availableReturnsZeroWhenPointDoesNotExist() {
         // given
+        given(pointBalanceCache.get(1L))
+                .willReturn(Optional.empty());
         given(pointRepository.findByUserId(1L))
                 .willReturn(Optional.empty());
 
@@ -52,6 +77,7 @@ class PointServiceTest {
 
         // then
         assertThat(result).isZero();
+        verify(pointBalanceCache).put(1L, 0L);
     }
 
     @Test
@@ -67,6 +93,7 @@ class PointServiceTest {
 
         // then
         assertThat(point.getBalance()).isEqualTo(7_000L);
+        verify(pointBalanceCache).evict(1L);
     }
 
     @Test
@@ -98,6 +125,7 @@ class PointServiceTest {
         // then
         assertThat(result).isFalse();
         assertThat(point.getBalance()).isEqualTo(1_000L);
+        verify(pointBalanceCache).evict(1L);
     }
 
     @Test
@@ -113,6 +141,7 @@ class PointServiceTest {
 
         // then
         assertThat(point.getBalance()).isEqualTo(10_000L);
+        verify(pointBalanceCache).evict(1L);
     }
 
     @Test

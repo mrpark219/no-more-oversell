@@ -15,17 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class PointService {
 
     private final PointRepository pointRepository;
+    private final PointBalanceCache pointBalanceCache;
 
     @Transactional(readOnly = true)
     public long available(Long userId) {
-        log.debug("포인트 잔액 조회 시도. userId={}", userId);
-
-        var balance = pointRepository.findByUserId(userId)
-                .map(Point::getBalance)
-                .orElse(0L);
-
-        log.debug("포인트 잔액 조회 완료. userId={}, balance={}", userId, balance);
-        return balance;
+        return pointBalanceCache.get(userId)
+                .orElseGet(() -> getAvailablePointFromRepository(userId));
     }
 
     @Transactional
@@ -39,6 +34,7 @@ public class PointService {
                 });
 
         point.deduct(amount);
+        pointBalanceCache.evict(userId);
         log.info("포인트 차감 성공. userId={}, amount={}, balance={}", userId, amount, point.getBalance());
     }
 
@@ -53,6 +49,8 @@ public class PointService {
             log.warn("포인트 차감 실패: 포인트가 존재하지 않습니다. userId={}, amount={}", userId, amount);
             return false;
         }
+
+        pointBalanceCache.evict(userId);
 
         if (!point.canAfford(amount)) {
             log.info(
@@ -78,9 +76,22 @@ public class PointService {
                 .orElseThrow(() -> {
                     log.warn("포인트 복구 실패: 포인트가 존재하지 않습니다. userId={}, amount={}", userId, amount);
                     return new PointNotFoundException();
-                });
+        });
 
         point.restore(amount);
+        pointBalanceCache.evict(userId);
         log.info("포인트 복구 성공. userId={}, amount={}, balance={}", userId, amount, point.getBalance());
+    }
+
+    private long getAvailablePointFromRepository(Long userId) {
+        log.debug("포인트 잔액 조회 시도. userId={}", userId);
+
+        var balance = pointRepository.findByUserId(userId)
+                .map(Point::getBalance)
+                .orElse(0L);
+
+        pointBalanceCache.put(userId, balance);
+        log.debug("포인트 잔액 조회 완료. userId={}, balance={}", userId, balance);
+        return balance;
     }
 }

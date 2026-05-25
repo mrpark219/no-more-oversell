@@ -69,7 +69,7 @@ public class ApiExceptionHandler {
     }
 
     private ResponseEntity<ApiErrorResponse> error(HttpStatus status, ApiException exception) {
-        log.warn(
+        log.info(
                 "API 비즈니스 예외 응답. status={}, code={}, message={}",
                 status.value(),
                 exception.getCode(),

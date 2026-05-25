@@ -9,6 +9,7 @@ spring:
     hikari:
       connection-timeout: 5000
       max-lifetime: 270000
+      maximum-pool-size: 30
   data:
     redis:
       timeout: ${REDIS_TIMEOUT:500ms}
@@ -19,6 +20,7 @@ spring:
       hibernate:
         default_batch_fetch_size: 1000
         show_sql: true
+    open-in-view: false
   flyway:
     enabled: true
     locations:
@@ -28,21 +30,22 @@ spring:
 resilience4j:
   circuitbreaker:
     configs:
-      # Spring Cloud CircuitBreakerFactory#create("checkoutResponseCache")는
-      # Resilience4j registry의 configuration 이름을 조회하므로 instances가 아니라 configs에 둔다.
-      checkoutResponseCache:
-        # Redis cache 장애가 반복되면 DB fallback을 빠르게 사용하기 위해 회로를 연다.
+      redisCache:
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 20
         minimumNumberOfCalls: 5
         failureRateThreshold: 50
-        # OPEN 상태를 짧게 유지해 Redis 복구 여부를 자주 확인한다.
         waitDurationInOpenState: 5s
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
+    instances:
+      redisCache:
+        baseConfig: redisCache
   timelimiter:
     configs:
-      # Redis cache 조회가 지연되면 checkout 응답을 오래 붙잡지 않고 fallback으로 전환한다.
-      checkoutResponseCache:
+      redisCache:
         timeoutDuration: 500ms
         cancelRunningFuture: true
+    instances:
+      redisCache:
+        baseConfig: redisCache

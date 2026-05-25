@@ -19,12 +19,17 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class StayProductServiceTest {
 
     @Mock
     private StayProductRepository stayProductRepository;
+
+    @Mock
+    private StayProductCache stayProductCache;
 
     @InjectMocks
     private StayProductService stayProductService;
@@ -34,6 +39,8 @@ class StayProductServiceTest {
     void getReturnsProductViewWhenProductExists() {
         // given
         var productId = 1L;
+        given(stayProductCache.get(productId))
+                .willReturn(Optional.empty());
         given(stayProductRepository.findById(productId))
                 .willReturn(Optional.of(stayProduct()));
 
@@ -48,6 +55,41 @@ class StayProductServiceTest {
         assertThat(result.salePrice()).isEqualTo(10_000L);
         assertThat(result.openAt()).isNotNull();
         assertThat(result.status()).isEqualTo(StayProductStatus.OPEN);
+        verify(stayProductCache).put(result);
+    }
+
+    @Test
+    @DisplayName("숙소 상품 캐시가 있으면 DB를 조회하지 않고 캐시 값을 반환한다")
+    void getReturnsCachedProductViewWithoutRepositoryLookup() {
+        // given
+        var productId = 1L;
+        var cachedProduct = StayProductView.from(stayProduct());
+        given(stayProductCache.get(productId))
+                .willReturn(Optional.of(cachedProduct));
+
+        // when
+        var result = stayProductService.get(productId);
+
+        // then
+        assertThat(result).isEqualTo(cachedProduct);
+        verifyNoInteractions(stayProductRepository);
+    }
+
+    @Test
+    @DisplayName("숙소 상품을 DB에서 직접 조회하면 캐시를 사용하지 않는다")
+    void getFromRepositoryReturnsProductViewWithoutCacheLookup() {
+        // given
+        var productId = 1L;
+        given(stayProductRepository.findById(productId))
+                .willReturn(Optional.of(stayProduct()));
+
+        // when
+        var result = stayProductService.getFromRepository(productId);
+
+        // then
+        assertThat(result.accommodationName()).isEqualTo("테스트 호텔");
+        assertThat(result.status()).isEqualTo(StayProductStatus.OPEN);
+        verifyNoInteractions(stayProductCache);
     }
 
     @Test
@@ -55,6 +97,8 @@ class StayProductServiceTest {
     void getThrowsExceptionWhenProductDoesNotExist() {
         // given
         var productId = 1L;
+        given(stayProductCache.get(productId))
+                .willReturn(Optional.empty());
         given(stayProductRepository.findById(productId))
                 .willReturn(Optional.empty());
 
@@ -72,6 +116,8 @@ class StayProductServiceTest {
     void getOpenReturnsProductViewWhenProductIsOpen() {
         // given
         var productId = 1L;
+        given(stayProductCache.get(productId))
+                .willReturn(Optional.empty());
         given(stayProductRepository.findById(productId))
                 .willReturn(Optional.of(stayProduct()));
 
@@ -84,10 +130,29 @@ class StayProductServiceTest {
     }
 
     @Test
+    @DisplayName("오픈된 숙소 상품을 DB에서 직접 조회하면 주문 가능 상품 조회 결과를 반환한다")
+    void getOpenFromRepositoryReturnsProductViewWhenProductIsOpen() {
+        // given
+        var productId = 1L;
+        given(stayProductRepository.findById(productId))
+                .willReturn(Optional.of(stayProduct()));
+
+        // when
+        var result = stayProductService.getOpenFromRepository(productId);
+
+        // then
+        assertThat(result.accommodationName()).isEqualTo("테스트 호텔");
+        assertThat(result.status()).isEqualTo(StayProductStatus.OPEN);
+        verifyNoInteractions(stayProductCache);
+    }
+
+    @Test
     @DisplayName("숙소 상품이 아직 오픈되지 않았으면 예외를 던진다")
     void getOpenThrowsExceptionWhenProductIsNotOpenYet() {
         // given
         var productId = 1L;
+        given(stayProductCache.get(productId))
+                .willReturn(Optional.empty());
         given(stayProductRepository.findById(productId))
                 .willReturn(Optional.of(stayProduct(LocalDateTime.now().plusDays(1), StayProductStatus.OPEN)));
 
@@ -105,6 +170,8 @@ class StayProductServiceTest {
     void getOpenThrowsExceptionWhenProductIsClosed() {
         // given
         var productId = 1L;
+        given(stayProductCache.get(productId))
+                .willReturn(Optional.empty());
         given(stayProductRepository.findById(productId))
                 .willReturn(Optional.of(stayProduct(LocalDateTime.now().minusDays(1), StayProductStatus.CLOSED)));
 

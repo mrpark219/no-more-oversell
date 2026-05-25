@@ -16,12 +16,17 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceTest {
 
     @Mock
     private InventoryRepository inventoryRepository;
+
+    @Mock
+    private ProductSoldOutCache productSoldOutCache;
 
     @InjectMocks
     private InventoryService inventoryService;
@@ -39,6 +44,22 @@ class InventoryServiceTest {
 
         // then
         assertThat(inventory.getSoldQuantity()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("재고 예약으로 판매 가능 수량이 0개가 되면 마감 힌트 캐시를 저장한다")
+    void reserveOneMarksSoldOutCacheWhenRemainingQuantityBecomesZero() {
+        // given
+        var inventory = inventory(10L, 9L);
+        given(inventoryRepository.getByProductIdWithLock(1L))
+                .willReturn(Optional.of(inventory));
+
+        // when
+        inventoryService.reserveOne(1L);
+
+        // then
+        assertThat(inventory.getSoldQuantity()).isEqualTo(10L);
+        verify(productSoldOutCache).markSoldOut(1L);
     }
 
     @Test
@@ -70,12 +91,15 @@ class InventoryServiceTest {
         // then
         assertThat(thrown)
                 .isInstanceOf(SoldOutException.class);
+        verify(productSoldOutCache).markSoldOut(1L);
     }
 
     @Test
     @DisplayName("재고가 있으면 판매 가능 여부를 true로 반환한다")
     void hasStockReturnsTrueWhenInventoryHasQuantity() {
         // given
+        given(productSoldOutCache.isSoldOut(1L))
+                .willReturn(false);
         given(inventoryRepository.findByProductId(1L))
                 .willReturn(Optional.of(inventory(10L, 9L)));
 
@@ -90,6 +114,8 @@ class InventoryServiceTest {
     @DisplayName("재고가 없으면 판매 가능 여부를 false로 반환한다")
     void hasStockReturnsFalseWhenInventoryDoesNotExist() {
         // given
+        given(productSoldOutCache.isSoldOut(1L))
+                .willReturn(false);
         given(inventoryRepository.findByProductId(1L))
                 .willReturn(Optional.empty());
 
@@ -98,6 +124,21 @@ class InventoryServiceTest {
 
         // then
         assertThat(result).isFalse();
+    }
+
+    @Test
+    @DisplayName("마감 힌트 캐시가 있으면 DB를 조회하지 않고 판매 불가로 반환한다")
+    void hasStockReturnsFalseWithoutRepositoryLookupWhenSoldOutCacheExists() {
+        // given
+        given(productSoldOutCache.isSoldOut(1L))
+                .willReturn(true);
+
+        // when
+        var result = inventoryService.hasStock(1L);
+
+        // then
+        assertThat(result).isFalse();
+        verifyNoInteractions(inventoryRepository);
     }
 
     @Test
@@ -113,6 +154,7 @@ class InventoryServiceTest {
 
         // then
         assertThat(inventory.getSoldQuantity()).isZero();
+        verify(productSoldOutCache).evict(1L);
     }
 
     private Inventory inventory(long totalQuantity, long soldQuantity) {

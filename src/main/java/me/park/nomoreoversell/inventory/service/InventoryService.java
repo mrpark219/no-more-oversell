@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
+    private final ProductSoldOutCache productSoldOutCache;
 
     @Transactional
     public void reserveOne(Long productId) {
@@ -34,6 +35,9 @@ public class InventoryService {
                 });
 
         if (!inventory.hasQuantity(quantity)) {
+            if (inventory.availableQuantity() == 0) {
+                productSoldOutCache.markSoldOut(productId);
+            }
             log.info(
                     "재고 예약 실패: 재고가 부족합니다. productId={}, quantity={}, totalQuantity={}, soldQuantity={}, available={}",
                     productId,
@@ -46,6 +50,9 @@ public class InventoryService {
         }
 
         inventory.reserve(quantity);
+        if (inventory.availableQuantity() == 0) {
+            productSoldOutCache.markSoldOut(productId);
+        }
         log.info(
                 "재고 예약 성공. productId={}, quantity={}, totalQuantity={}, soldQuantity={}, available={}",
                 productId,
@@ -66,12 +73,37 @@ public class InventoryService {
         log.debug("재고 여부 조회 시도. productId={}, quantity={}", productId, quantity);
         validateQuantity(quantity, "재고 조회");
 
+        if (productSoldOutCache.isSoldOut(productId)) {
+            log.debug("재고 여부 조회 완료: 마감 힌트 캐시 적중. productId={}, quantity={}", productId, quantity);
+            return false;
+        }
+
         var hasStock = inventoryRepository.findByProductId(productId)
-                .map(inventory -> inventory.hasQuantity(quantity))
+                .map(inventory -> {
+                    var result = inventory.hasQuantity(quantity);
+                    if (inventory.availableQuantity() == 0) {
+                        productSoldOutCache.markSoldOut(productId);
+                    }
+                    return result;
+                })
                 .orElse(false);
 
         log.debug("재고 여부 조회 완료. productId={}, quantity={}, hasStock={}", productId, quantity, hasStock);
         return hasStock;
+    }
+
+    @Transactional(readOnly = true)
+    public void warmUpSoldOutHint(Long productId) {
+        log.debug("재고 마감 힌트 웜업 시도. productId={}", productId);
+
+        inventoryRepository.findByProductId(productId)
+                .ifPresent(inventory -> {
+                    if (inventory.availableQuantity() == 0) {
+                        productSoldOutCache.markSoldOut(productId);
+                    } else {
+                        productSoldOutCache.evict(productId);
+                    }
+                });
     }
 
     @Transactional
@@ -101,6 +133,7 @@ public class InventoryService {
         }
 
         inventory.restore(quantity);
+        productSoldOutCache.evict(productId);
         log.info(
                 "재고 복구 성공. productId={}, quantity={}, totalQuantity={}, soldQuantity={}, available={}",
                 productId,

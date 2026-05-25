@@ -83,7 +83,7 @@ public class OrderService {
                 throw new InvalidOrderSheetStateException();
             }
 
-            var stayProduct = stayProductService.getOpen(request.stayProductId());
+            var stayProduct = stayProductService.getOpenFromRepository(request.stayProductId());
             paymentPlanValidator.validate(orderSheet.getSalePrice(), paymentDetailRequests(request.paymentDetails()));
             orderSheet.markApproving();
             return OrderPreparation.newOrder(orderSheet, stayProduct);
@@ -155,7 +155,7 @@ public class OrderService {
     }
 
     private CreateOrderResponse findConfirmedOrder(OrderSheet orderSheet) {
-        var stayProduct = stayProductService.get(orderSheet.getProductId());
+        var stayProduct = stayProductService.getFromRepository(orderSheet.getProductId());
         var order = orderRepository.findByOrderSheetId(orderSheet.getId())
                 .orElseThrow(InvalidOrderSheetStateException::new);
         var payment = paymentRepository.findByOrderSheetId(orderSheet.getId())

@@ -9,7 +9,6 @@ import me.park.nomoreoversell.point.service.PointService;
 import me.park.nomoreoversell.stayproduct.service.StayProductService;
 import me.park.nomoreoversell.stayproduct.service.StayProductView;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -24,7 +23,6 @@ public class OrderSheetService {
     private final PointService pointService;
     private final CheckoutResponseCache checkoutResponseCache;
 
-    @Transactional
     public CheckoutResponse checkout(CheckoutRequest request) {
         return checkoutResponseCache.get(request.userId(), request.stayProductId())
                 .orElseGet(() -> createCheckoutResponse(request));

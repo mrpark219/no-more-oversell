@@ -79,6 +79,27 @@ class OrderSheetServiceTest {
     }
 
     @Test
+    @DisplayName("재고 서비스가 판매 불가로 응답하면 체크아웃도 판매 불가로 응답한다")
+    void checkoutReturnsNoStockWhenInventoryServiceReturnsFalse() {
+        // given
+        var userId = 1L;
+        var productId = 10L;
+        given(checkoutResponseCache.get(userId, productId)).willReturn(Optional.empty());
+        given(stayProductService.getOpen(productId)).willReturn(stayProduct(productId));
+        given(inventoryService.hasStock(productId)).willReturn(false);
+        given(pointService.available(userId)).willReturn(5_000L);
+        given(orderSheetRepository.save(any(OrderSheet.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        var response = orderSheetService.checkout(new CheckoutRequest(userId, productId));
+
+        // then
+        assertThat(response.stayProduct().hasStock()).isFalse();
+        verify(inventoryService).hasStock(productId);
+    }
+
+    @Test
     @DisplayName("같은 사용자가 같은 상품 체크아웃에 재진입하면 Redis 캐시의 응답 값을 반환한다")
     void checkoutReturnsCachedResponse() {
         // given

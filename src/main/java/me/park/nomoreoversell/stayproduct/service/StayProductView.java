@@ -37,4 +37,8 @@ public record StayProductView(
                 .maxPerUser(stayProduct.getMaxPerUser())
                 .build();
     }
+
+    public boolean isOpenAt(LocalDateTime now) {
+        return status == StayProductStatus.OPEN && !now.isBefore(openAt);
+    }
 }
